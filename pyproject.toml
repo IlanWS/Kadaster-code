@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kadaster-code"
+version = "0.1.0"
+description = "Code for processing Kadaster/BrT data and downloading images"
+readme = "README.md"
+authors = [
+    {name = "Ilan WS", email = "wouter@unknown.com"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28.0",
+    "pillow>=9.0.0",
+    "scikit-learn>=1.0.0",
+    "numpy>=1.24.0",
+    "tensorflow>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter>=1.0.0",
+    "black>=23.0.0",
+    "ruff>=0.0.280",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
