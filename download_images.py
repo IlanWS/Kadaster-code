@@ -2,8 +2,8 @@ import json
 import os
 import requests
 
-json_path = "zutphen met labels"
-output_folder = "zutphen zonder gebouwen map"
+json_path = "zutphen-met-labels.json"
+output_folder = "zutphen-zonder-gebouwen-map"
 timeout_seconds = 5
 
 if not os.path.exists(output_folder):
