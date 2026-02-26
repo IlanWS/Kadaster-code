@@ -1,4 +1,4 @@
-from Evaluate import visualize_results
+from Evaluate import *
 
 if __name__ == '__main__':
     visualize_results()

@@ -1,3 +1,3 @@
 learning_rate = 0.001
-epochs = 5
+epochs = 50
 batch_size = 5

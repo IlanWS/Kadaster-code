@@ -1,10 +1,11 @@
+from config import *
+
 #import images from files into numpy arrays. 625 images of 512 by 512 arcross 3 channels (RGB)
 #images are already right format, but slice anyway to ensure no shape mismatch error in the model
 #before running, ensure that the data is downloaded in the correct directory, or change dir in config.py
-import os
 from PIL import Image
 import numpy as np
-from config import *
+import os
 
 def load_images():
     input_image_array = np.empty([number_of_data_pairs,512,512,3], dtype=np.int16)
@@ -25,12 +26,12 @@ def load_images():
 
 #make input and output data into binary images.
 #less redundent computation with minimal loss of inflormation due to data properties (near black and white images)
-    input_image_array = np.mean(input_image_array, axis = 3)
+    input_image_array = np.mean(input_image_array, axis = 3, keepdims = True)
     input_image_array[input_image_array<128] = 0
     input_image_array[input_image_array>=128] = 1
     input_image_array = np.array(input_image_array, dtype = int)
 
-    target_image_array = np.mean(target_image_array, axis = 3)
+    target_image_array = np.mean(target_image_array, axis = 3, keepdims = True)
     target_image_array[target_image_array<128] = 0
     target_image_array[target_image_array>=128] = 1
     target_image_array = np.array(target_image_array, dtype = int)

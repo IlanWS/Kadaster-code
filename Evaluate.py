@@ -1,6 +1,7 @@
-import matplotlib.pyplot as plt
 from Model import *
-from Data_preprocessing import data_split
+from Data_preprocessing import *
+
+import matplotlib.pyplot as plt
 
 def visualize_results():
     x_train, y_train, x_test, y_test = data_split()
@@ -12,4 +13,3 @@ def visualize_results():
     axarr[1].imshow(prediction[i])
     axarr[2].imshow(y_test[i])
     plt.show()
-

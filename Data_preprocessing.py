@@ -1,5 +1,6 @@
-from sklearn.model_selection import train_test_split
 from Image_load import *
+
+from sklearn.model_selection import train_test_split
 
 
 def data_split():
@@ -10,4 +11,3 @@ def data_split():
     x_test = np.array(x_test)
     y_test = np.array(y_test)
     return x_train, y_train, x_test, y_test
-

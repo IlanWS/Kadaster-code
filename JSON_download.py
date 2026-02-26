@@ -1,6 +1,6 @@
 #only needs to be ran if new data must be obtained from QGIS through the WSL server
 import json
-import os
+import os.path
 import requests
 from config import *
 
@@ -39,4 +39,4 @@ def json_download(folder):
 
 #this must first be ran, while the WSL is configured for the roadnetwork (with input_data_dir)
 #then it must be ran again with the WSL configured for the labels (with output_data)
-json_download(input_data_dir)
+json_download(input_folder)
