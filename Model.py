@@ -1,5 +1,5 @@
 from Data_preprocessing import *
-from Hyperparameters import *
+from config import *
 
 import torch
 from torch import nn, optim
@@ -47,6 +47,7 @@ class UNetRoadLabeler(nn.Module):
 
     def forward(self, x):
         # Encoder
+        print("forward")
         f1 = self.f1(x)
         p1 = self.p1(f1)
 
