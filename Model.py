@@ -80,8 +80,8 @@ def compile_model():
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
     model = UNetRoadLabeler(1,1)
 
-    #Here you should use device = torch.device("xpu" if torch.cuda.is_available() else "cpu") if you use don't use NVIDIA
-    device = torch.device("cuda" if torch.xpu.is_available() else "cpu")
+    #Here you should use device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     #try focal cross entropy
     criterion = torch.nn.BCELoss()
