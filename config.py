@@ -5,12 +5,12 @@ input_folder = "".join([os.getcwd(),"/Data/Roadnetwork"])
 output_folder = "".join([os.getcwd(),"/Data/Labels"])
 results_folder = "".join([os.getcwd(),"/Data/Predictions"])
 
-number_of_data_pairs = 625
+number_of_data_pairs = 100
 data_split_proportion=0.2
 
 #Hyperparamers
 learning_rate = 0.001
-epochs = 50
+epochs = 5
 batch_size = 5
 
 #requirements

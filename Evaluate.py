@@ -15,11 +15,11 @@ def visualize_results():
 
     for i in range(int(number_of_data_pairs*data_split_proportion)):
         im = Image.fromarray((np.squeeze(prediction[i], axis=2)*255).astype(np.uint8))
-        path = "".join([os.getcwd(),"/Data/Predictions/prediction_",str(i),".png"])
+        path = "".join([results_folder,"/prediction_",str(i),".png"])
         im.save(path)
 
         im = Image.fromarray((np.squeeze(x_test[i], axis=2)*255).astype(np.uint8))
-        path = "".join([os.getcwd(),"/Data/Predictions/input_",str(i),".png"])
+        path = "".join([results_folder,"/input_",str(i),".png"])
         im.save(path)
 
     i = 1
