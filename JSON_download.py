@@ -4,8 +4,8 @@ import os.path
 import requests
 from config import *
 
-json_path = json_path
-input_folder = input_folder
+json_path = "".join([json_path,"/zoom_4.json"])
+input_folder = "".join([os.getcwd(),"/Data/Labels_zoom"])
 output_folder = output_folder
 timeout_seconds = 5
 
@@ -24,7 +24,7 @@ def json_download(folder):
             print(f"Skipping index {index}: Geen URL gevonden.")
             continue
         try:
-            filename = f"image_{index}.jpg"
+            filename = f"image_{index + 1200}.jpg"
             save_path = os.path.join(folder, filename)
             response = requests.get(url, timeout=timeout_seconds)
             if response.status_code == 200:
