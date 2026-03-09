@@ -22,9 +22,11 @@ def visualize_results():
         path = "".join([results_folder,"/input_",str(i),".png"])
         im.save(path)
 
+"""
     i = 1
     f, axarr = plt.subplots(1, 3)
     axarr[0].imshow(x_test[i])
     axarr[1].imshow(prediction[i])
     axarr[2].imshow(y_test[i])
     plt.show()
+"""

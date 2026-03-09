@@ -1,6 +1,6 @@
 import os
 #Data specifications
-json_path = "".join([os.getcwd(),"/Data"])
+json_path = "".join([os.getcwd(),"/Data/JSON_files"])
 input_folder = "".join([os.getcwd(),"/Data/Roadnetwork_zoom"])
 output_folder = "".join([os.getcwd(),"/Data/Labels_zoom"])
 results_folder = "".join([os.getcwd(),"/Data/Predictions"])
