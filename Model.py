@@ -97,6 +97,9 @@ def compile_model():
     train_loader = DataLoader(TensorDataset(x_train_pt, y_train_pt), batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(TensorDataset(x_test_pt, y_test_pt), batch_size=batch_size, shuffle=False)
 
+    if not os.path.isdir(model_path):
+        os.makedirs(model_path)
+
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -121,44 +124,13 @@ def compile_model():
         print(
             f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
 
+        if (epoch + 1) % 10 == 0:
+            torch.save(model.state_dict(), "".join([model_path, "/unet_", str(epoch + 1), ".pth"]))
+            
     #Domme pytorch heeft geen summary functie, dus je zou pytorchsummary kunnen pip installen als je wil zien, dan from pytorchsummary import summary en deze lijn:
     #summary(model, input_size=(1, 512, 512))
-
-    if not os.path.isdir(model_path):
-        os.makedirs(model_path)
-
-    torch.save(model, "".join([model_path, "/unet_", str(epochs), ".pth"]))
-
-    return model
+    return
 
 
-def predict_model():
-    model = compile_model()
-    x_train, y_train, x_test, y_test = data_split()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    model.eval()
-
-    # Convert test data to tensor
-    test_input_pt = torch.from_numpy(x_test).permute(0, 3, 1, 2).float()
-    test_loader = DataLoader(test_input_pt, batch_size=batch_size, shuffle=False)
-
-    # Clear GPU cache to free fragmented memory
-    torch.cuda.empty_cache()
-
-    # Process predictions in batches
-    predictions_list = []
-    with torch.no_grad():
-        for batch in test_loader:
-            batch = batch.to(device)
-            batch_predictions = model(batch)
-            predictions_list.append(batch_predictions.cpu())
-
-    # Concatenate all predictions and convert to numpy
-    predictions = torch.cat(predictions_list, dim=0).numpy().transpose(0, 2, 3, 1)
-
-    #als we binaire output willen ipv heatmap, gebruik volgende lijn.
-    #predictions = (predictions > 0.5).astype(np.uint8)
-    return predictions
 
