@@ -123,10 +123,16 @@ def compile_model():
 
     #Domme pytorch heeft geen summary functie, dus je zou pytorchsummary kunnen pip installen als je wil zien, dan from pytorchsummary import summary en deze lijn:
     #summary(model, input_size=(1, 512, 512))
+
+    if not os.path.isdir(model_path):
+        os.makedirs(model_path)
+
+    torch.save(model, "".join([model_path, "/unet_", str(epochs), ".pth"]))
+
     return model
 
 
-def train_model():
+def predict_model():
     model = compile_model()
     x_train, y_train, x_test, y_test = data_split()
 

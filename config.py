@@ -4,6 +4,7 @@ json_path = "".join([os.getcwd(),"/Data/JSON_files"])
 input_folder = "".join([os.getcwd(),"/Data/Roadnetwork_zoom"])
 output_folder = "".join([os.getcwd(),"/Data/Labels_zoom"])
 results_folder = "".join([os.getcwd(),"/Data/Predictions"])
+model_path = "".join([os.getcwd(),"/Models"])
 
 input_image_height = 360
 input_image_width = 624
