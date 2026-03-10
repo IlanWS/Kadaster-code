@@ -134,12 +134,23 @@ def train_model():
     model.to(device)
     model.eval()
 
-    test_input = torch.from_numpy(x_test).permute(0, 3, 1, 2).float().to(device)
+    # Convert test data to tensor
+    test_input_pt = torch.from_numpy(x_test).permute(0, 3, 1, 2).float()
+    test_loader = DataLoader(test_input_pt, batch_size=batch_size, shuffle=False)
 
+    # Clear GPU cache to free fragmented memory
+    torch.cuda.empty_cache()
+
+    # Process predictions in batches
+    predictions_list = []
     with torch.no_grad():
-        predictions = model(test_input)
+        for batch in test_loader:
+            batch = batch.to(device)
+            batch_predictions = model(batch)
+            predictions_list.append(batch_predictions.cpu())
 
-    predictions = predictions.cpu().numpy().transpose(0, 2, 3, 1)
+    # Concatenate all predictions and convert to numpy
+    predictions = torch.cat(predictions_list, dim=0).numpy().transpose(0, 2, 3, 1)
 
     #als we binaire output willen ipv heatmap, gebruik volgende lijn.
     #predictions = (predictions > 0.5).astype(np.uint8)

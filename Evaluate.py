@@ -11,7 +11,7 @@ def visualize_results():
     prediction = train_model()
 
     if not os.path.isdir(results_folder):
-        os.mkdir(results_folder)
+        os.makedirs(results_folder)
 
     for i in range(int(number_of_data_pairs*data_split_proportion)):
         im = Image.fromarray((np.squeeze(prediction[i], axis=2)*255).astype(np.uint8))
