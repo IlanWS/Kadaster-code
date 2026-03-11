@@ -4,10 +4,10 @@ from Data_preprocessing import *
 
 import torch
 
-def predict_model(model_name):
+def predict_model(name):
     
     model = UNetRoadLabeler(1, 1)
-    model.load_state_dict(torch.load("".join([model_path, "/", model_name, ".pth"])))
+    model.load_state_dict(torch.load("".join([model_path,name, ".pth"])))
     
     x_train, y_train, x_test, y_test = data_split()
 

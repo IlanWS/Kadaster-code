@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     #make predictions and save them as images
     for epoch in range(10):
-        model_name = "".join([model_name, str((epoch+1)*10)])
+        model_name = "".join([model_name, "_", str((epoch+1)*10)])
         visualize_results(model_name)
 
-    compare_predictions(model_name)
+    compare_predictions()
