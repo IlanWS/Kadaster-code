@@ -1,5 +1,7 @@
 from Model import *
 from Save_prediction import *
+from config import *
+from visualize import *
 
 if __name__ == '__main__':
     #train and save models
@@ -7,5 +9,7 @@ if __name__ == '__main__':
 
     #make predictions and save them as images
     for epoch in range(10):
-        model_name = "".join(["unet_", str((epoch+1)*10)])
+        model_name = "".join([model_name, str((epoch+1)*10)])
         visualize_results(model_name)
+
+    compare_predictions(model_name)

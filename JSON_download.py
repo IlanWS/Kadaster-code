@@ -4,9 +4,8 @@ import os.path
 import requests
 from config import *
 
-json_path = "".join([json_path,"/zoom_4.json"])
-input_folder = "".join([os.getcwd(),"/Data/Labels_zoom"])
-output_folder = output_folder
+print(requests.__version__)
+
 timeout_seconds = 5
 
 def json_download(folder):
@@ -39,4 +38,4 @@ def json_download(folder):
 
 #this must first be ran, while the WSL is configured for the roadnetwork (with input_data_dir)
 #then it must be ran again with the WSL configured for the labels (with output_data)
-#json_download(input_folder)
+json_download(input_folder)

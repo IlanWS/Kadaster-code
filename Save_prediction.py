@@ -24,12 +24,3 @@ def visualize_results(model_name):
         im = Image.fromarray((np.squeeze(x_test[i], axis=2)*255).astype(np.uint8))
         path = "".join([results_folder,"/",model_name,"/input_",str(i),".png"])
         im.save(path)
-
-"""
-    i = 1
-    f, axarr = plt.subplots(1, 3)
-    axarr[0].imshow(x_test[i])
-    axarr[1].imshow(prediction[i])
-    axarr[2].imshow(y_test[i])
-    plt.show()
-"""
