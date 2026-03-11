@@ -11,7 +11,7 @@ def compare_predictions():
     if not os.path.isdir("".join([results_folder,"/Comparisons"])):
         os.makedirs("".join([results_folder,"/Comparisons"]))
 
-    for i in range(1):
+    for i in range(10):
         f, axarr = plt.subplots(3, 4)
         axarr[0, 0].imshow(x_test[i])
         axarr[0, 1].imshow(y_test[i])
@@ -25,4 +25,4 @@ def compare_predictions():
         axarr[2, 1].imshow(np.array(Image.open("".join([results_folder, model_name, "_80/prediction_",str(i),".png"]))))
         axarr[2, 2].imshow(np.array(Image.open("".join([results_folder, model_name, "_90/prediction_",str(i),".png"]))))
         axarr[2, 3].imshow(np.array(Image.open("".join([results_folder, model_name,"_100/prediction_",str(i),".png"]))))
-        plt.savefig("".join([results_folder,"/Comparisons/compare_",str(i),".png"]))
+        plt.savefig("".join([results_folder,model_name,"/Comparisons/compare_",str(i),".png"]))
