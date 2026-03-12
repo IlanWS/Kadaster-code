@@ -1,5 +1,6 @@
 from Data_preprocessing import *
 from config import *
+from Loss_functions import *
 
 import torch
 from torch import nn, optim
@@ -18,6 +19,7 @@ class UNetRoadLabeler(nn.Module):
                 nn.BatchNorm2d(out_feat),
                 nn.ReLU(inplace=True)
             )
+        
         # Encoder (Downsampling)
         self.f1 = conv_block(in_channels, 64)
         self.p1 = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -76,6 +78,100 @@ class UNetRoadLabeler(nn.Module):
         outputs = self.final_conv(f6)
         return self.sigmoid(outputs)
 
+
+
+"""
+class DeepLabRoadLabeler(nn.Module):
+    def __init__(self, in_channels, out_channels=1):
+        super(DeepLabRoadLabeler, self).__init__()
+        def conv_block(in_feat, out_feat, kernel_size, padding, dilation, stride):
+            return nn.Sequential(
+                nn.Conv2d(in_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
+                nn.ReLU(inplace=True)
+            )
+        
+        def conv_block_deep(in_feat, out_feat, kernel_size, padding, dilation, stride):
+            return nn.Sequential(
+                nn.Conv2d(in_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
+                nn.ReLU(inplace=True)
+            )
+        
+        self.f1 = conv_block(in_channels, 64, kernel_size=3, padding=1, dilation=1, stride=1)
+        self.p1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
+
+        self.f2 = conv_block(64, 128, kernel_size=3, padding=1, dilation=1, stride=1)
+        self.p2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
+
+        self.f3 = conv_block_deep(128, 256, kernel_size=3, padding=1, dilation=1, stride=1)
+        self.p3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
+
+        self.f4 = conv_block_deep(256, 512, kernel_size=3, padding=1, dilation=1, stride=1)
+        self.p4 = nn.MaxPool2d(kernel_size=2, stride=1, padding=1)
+
+        self.f5 = conv_block_deep(512, 512, kernel_size=3, padding=2, dilation=2, stride=1)
+        self.p5 = nn.MaxPool2d(kernel_size=1, stride=2, padding=1)
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(kernel_size=3, stride=1, padding=1)
+
+
+        # Bottleneck
+        self.bottleneck = conv_block(256, 512)
+
+        # Decoder (Upsampling)
+        self.u3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.dec3 = conv_block(512, 256) # 512 because of concatenation (256+256)
+
+        self.u2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.dec2 = conv_block(256, 128) # 128+128
+
+        self.u1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.dec1 = conv_block(128, 64)   # 64+64
+
+        # Final Output Layer
+        self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # Encoder
+        print("forward")
+        f1 = self.f1(x)
+        p1 = self.p1(f1)
+
+        f2 = self.f2(p1)
+        p2 = self.p2(f2)
+
+        f3 = self.f3(p2)
+        p3 = self.p3(f3)
+
+        # Bottleneck
+        bn = self.bottleneck(p3)
+
+        # Decoder
+        u3 = self.u3(bn)
+        u3 = torch.cat([u3, f3], dim=1) # Skip connection
+        f4 = self.dec3(u3)
+
+        u2 = self.u2(f4)
+        u2 = torch.cat([u2, f2], dim=1) # Skip connection
+        f5 = self.dec2(u2)
+
+        u1 = self.u1(f5)
+        u1 = torch.cat([u1, f1], dim=1) # Skip connection
+        f6 = self.dec1(u1)
+
+        outputs = self.final_conv(f6)
+        return self.sigmoid(outputs)
+"""
+
+
+
+
 def compile_model():
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
     model = UNetRoadLabeler(1,1)
@@ -84,9 +180,10 @@ def compile_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     #try focal cross entropy
-    criterion = torch.nn.BCELoss()
+    #criterion = torch.nn.BCELoss()
+    criterion = Adaptive_wing_loss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
+    
     x_train, y_train, x_test, y_test = data_split()
 
     x_train_pt = torch.from_numpy(x_train).permute(0, 3, 1, 2).float()
@@ -99,7 +196,7 @@ def compile_model():
 
     if not os.path.isdir(model_path):
         os.makedirs(model_path)
-
+    print("start training")
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0

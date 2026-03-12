@@ -1,7 +1,7 @@
 import os
 #Data specifications
 
-model_name = "unet_7500"
+model_name = "unet_5000"
 model_path = "".join([os.getcwd(),"/Models/",model_name,"/"])
 
 json_path = "".join([os.getcwd(),"/Data/JSON_files/zoom_",model_name,".json"])
