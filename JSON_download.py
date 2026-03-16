@@ -23,7 +23,7 @@ def json_download(folder):
             print(f"Skipping index {index}: Geen URL gevonden.")
             continue
         try:
-            filename = f"image_{index}.jpg"
+            filename = f"image_{index +900}.jpg"
             save_path = os.path.join(folder, filename)
             response = requests.get(url, timeout=timeout_seconds)
             if response.status_code == 200:
@@ -38,4 +38,4 @@ def json_download(folder):
 
 #this must first be ran, while the WSL is configured for the roadnetwork (with input_data_dir)
 #then it must be ran again with the WSL configured for the labels (with output_data)
-json_download(output_folder)
+json_download(input_folder)
