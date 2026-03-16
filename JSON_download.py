@@ -23,7 +23,7 @@ def json_download(folder):
             print(f"Skipping index {index}: Geen URL gevonden.")
             continue
         try:
-            filename = f"image_{index +900}.jpg"
+            filename = f"image_{index}.jpg"
             save_path = os.path.join(folder, filename)
             response = requests.get(url, timeout=timeout_seconds)
             if response.status_code == 200:

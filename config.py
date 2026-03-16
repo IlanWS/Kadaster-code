@@ -1,6 +1,9 @@
 import os
+
+from Model import *
 #Data specifications
 
+#chosen_model = UNetRoadLabeler(1, 1)
 model_name = "unet_balenced_2500"
 model_path = "".join([os.getcwd(),"/Models/",model_name,"/"])
 
