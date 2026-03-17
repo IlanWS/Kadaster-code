@@ -6,7 +6,7 @@ import torch
 
 def predict_model(name):
     
-    model = UNetRoadLabeler(1, 1)
+    model = StackedHourglassRoadLabeler(1)
     model.load_state_dict(torch.load("".join([model_path,name, ".pth"])))
     
     x_train, y_train, x_test, y_test = data_split()

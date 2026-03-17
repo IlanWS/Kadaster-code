@@ -18,10 +18,10 @@ canvas.refresh()
 
 #loop over area
 for i in range(25):
-    newx= x+i*100
+    newx= x+(i+i)*100
     for j in range(25):
         loop = QEventLoop()
-        newy= y - j*100
+        newy= y - (j+1)*100
         point = QgsPointXY(newx, newy)
         canvas.setCenter(point)
         canvas.mapCanvasRefreshed.connect(loop.quit)

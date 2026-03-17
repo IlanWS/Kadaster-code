@@ -87,6 +87,7 @@ class DeepLabRoadLabeler(nn.Module):
         super(DeepLabRoadLabeler, self).__init__()
         # hele deeplab archi, met ResNet backbone, ook allemaal andere versies, nog even kijken
 
+        print("loading in")
         if os.path.isdir("".join([os.getcwd(), "/.cache/torch/hub/checkpoints/deeplabv3_resnet101_coco-586e9e4e.pth"])):
             model = DeepLabV3_ResNet101_Weights(pretrained=False)
             checkpoint = torch.load("".join([os.getcwd(), "/.cache/torch/hub/checkpoints/deeplabv3_resnet101_coco-586e9e4e.pth"]), map_location='cpu')
@@ -96,6 +97,8 @@ class DeepLabRoadLabeler(nn.Module):
             weights = DeepLabV3_ResNet101_Weights.DEFAULT
             self.network = models.segmentation.deeplabv3_resnet101(weights=weights)
         
+        print("loaded")
+
         # ResNet wil 3 channels, geef hem 1 (of eig inputchannels maar dat is voor nu 1)
         old_conv = self.network.backbone.conv1
         self.network.backbone.conv1 = nn.Conv2d(
@@ -123,6 +126,7 @@ class DeepLabRoadLabeler(nn.Module):
             self.network.aux_classifier = None
 
     def forward(self, x):
+        print("start forward")
         input_shape = x.shape[-2:] # (360, 640) min kan ook weg
         
         # output van voorgecodeerde deeplab model
@@ -256,7 +260,6 @@ class Residual(nn.Module):
         return self.relu(out + identity)
 
 class Hourglass(nn.Module):
-    """A single Hourglass unit"""
     def __init__(self, depth, channels):
         super(Hourglass, self).__init__()
         self.depth = depth
@@ -277,8 +280,8 @@ class Hourglass(nn.Module):
         low2 = self.low2(low1)
         low3 = self.low3(low2)
         low4 = self.low4(low3)
-        # Upsample using nearest neighbor or bilinear to match 'up1'
-        up2 = F.interpolate(low4, scale_factor=2, mode='nearest')
+        # Upsample to exactly match up1's spatial size to avoid odd/even mismatches
+        up2 = F.interpolate(low4, size=up1.shape[-2:], mode='nearest')
         return up1 + up2
 
 class StackedHourglassRoadLabeler(nn.Module):
@@ -297,16 +300,17 @@ class StackedHourglassRoadLabeler(nn.Module):
             Residual(128, num_channels)
         )
         
-        self.hgs = nn.ModuleList([Hourglass(4, num_channels) for _ in range(num_stacks)])
+        self.hgs = nn.ModuleList([Hourglass(4, num_channels) for i in range(num_stacks)])
         self.features = nn.ModuleList([nn.Sequential(Residual(num_channels, num_channels),
                                                     nn.Conv2d(num_channels, num_channels, 1),
                                                     nn.BatchNorm2d(num_channels),
-                                                    nn.ReLU(inplace=True)) for _ in range(num_stacks)])
+                                                    nn.ReLU(inplace=True)) for i in range(num_stacks)])
         
         # Heatmap prediction layers
-        self.outs = nn.ModuleList([nn.Conv2d(num_channels, 1, 1) for _ in range(num_stacks)])
-        self.merge_features = nn.ModuleList([nn.Conv2d(num_channels, num_channels, 1) for _ in range(num_stacks)])
-        self.merge_preds = nn.ModuleList([nn.Conv2d(1, num_channels, 1) for _ in range(num_stacks)])
+        self.outs = nn.ModuleList([nn.Conv2d(num_channels, 1, 1) for i in range(num_stacks)])
+        self.merge_features = nn.ModuleList([nn.Conv2d(num_channels, num_channels, 1) for i in range(num_stacks)])
+        self.merge_preds = nn.ModuleList([nn.Conv2d(1, num_channels, 1) for i in range(num_stacks)])
+
 
     def forward(self, x):
         # x: (B, 1, 360, 640)
@@ -324,18 +328,14 @@ class StackedHourglassRoadLabeler(nn.Module):
         
         # Resize final predictions to original 360x640
         final_outputs = [F.interpolate(o, size=(360, 640), mode='bilinear') for o in combined_outputs]
-        
-        if self.training:
-            return final_outputs # List of heatmaps for intermediate supervision
-        return torch.sigmoid(final_outputs[-1]) # Only the final heatmap for inference
-
-
+        # Use final stage output for loss and inference
+        return torch.sigmoid(final_outputs[-1])
 
 
 
 def compile_model():
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
-    model = UNetRoadLabeler(1, 1)
+    model = StackedHourglassRoadLabeler(1)
 
     #Here you should use device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
