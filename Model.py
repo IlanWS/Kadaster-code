@@ -314,6 +314,7 @@ class StackedHourglassRoadLabeler(nn.Module):
 
     def forward(self, x):
         # x: (B, 1, 360, 640)
+        print("forward")
         x = self.pre(x)
         combined_outputs = []
         
