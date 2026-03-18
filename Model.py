@@ -115,13 +115,23 @@ class DeepLabRoadLabeler(nn.Module):
             self.network.backbone.conv1.weight[:] = old_conv.weight.sum(dim=1, keepdim=True)
 
         # 3. Modify the Output Layer (Classifier)
-        # The final layer is a Conv2d(256, 21, kernel_size=1). We change 21 to 1.
-        self.network.classifier[4] = nn.Conv2d(256, output_channels, kernel_size=(1, 1))
+        # DeepLab's classifier is typically [Conv2d(2048, 256), Conv2d(256, num_classes)]
+        # We replace just the final layer so we keep internal channels consistent.
+        if hasattr(self.network, 'classifier') and len(self.network.classifier) >= 1:
+            # If classifier is an nn.Sequential, try to replace last conv.
+            if isinstance(self.network.classifier, nn.Sequential):
+                last = list(self.network.classifier.children())[-1]
+                if isinstance(last, nn.Conv2d):
+                    in_ch = last.in_channels
+                    self.network.classifier[-1] = nn.Conv2d(in_ch, output_channels, kernel_size=(1,1))
+            else:
+                self.network.classifier = nn.Conv2d(self.network.classifier.in_channels, output_channels, kernel_size=1)
 
         # 4. Modify the Auxiliary Classifier
-        # DeepLab uses an internal loss during training to help convergence.
+        # DeepLab uses an internal auxiliary arm during training to help convergence.
         if use_aux and self.network.aux_classifier is not None:
-            self.network.aux_classifier[4] = nn.Conv2d(1024, output_channels, kernel_size=(1, 1))
+            from torchvision.models.segmentation.fcn import FCNHead
+            self.network.aux_classifier = FCNHead(1024, output_channels)
         else:
             self.network.aux_classifier = None
 
@@ -135,11 +145,6 @@ class DeepLabRoadLabeler(nn.Module):
         # Resize output back to original input size if the stride 
         # caused a slight mismatch (e.g., 360 is not perfectly divisible by 32)
         out = F.interpolate(result['out'], size=input_shape, mode='bilinear', align_corners=False)
-        
-        if self.training and self.network.aux_classifier is not None:
-            aux = F.interpolate(result['aux'], size=input_shape, mode='bilinear', align_corners=False)
-            return {'out': out, 'aux': aux}
-        
         return torch.sigmoid(out)
 
 
@@ -336,7 +341,7 @@ class StackedHourglassRoadLabeler(nn.Module):
 
 def compile_model():
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
-    model = StackedHourglassRoadLabeler(1)
+    model = DeepLabRoadLabeler(1, use_aux=False)
 
     #Here you should use device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

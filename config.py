@@ -2,7 +2,7 @@ import os
 #Data specifications
 
 #chosen_model = UNetRoadLabeler(1, 1)
-model_name = "StackedHourglass_balanced_2500_met_rand"
+model_name = "Deeplab_balanced_2500_met_rand"
 model_path = "".join([os.getcwd(),"/Models/",model_name,"/"])
 
 json_path = "".join([os.getcwd(),"/Data/JSON_files/",model_name,".json"])
@@ -18,4 +18,4 @@ data_split_proportion = 0.2
 #Hyperparamers
 learning_rate = 0.001
 epochs = 100
-batch_size = 32
+batch_size = 16
