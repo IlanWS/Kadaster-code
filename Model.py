@@ -387,7 +387,7 @@ def compile_model():
         print(
             f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
 
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 2 == 0:
             torch.save(model.state_dict(), "".join([model_path, model_name,"_", str(epoch + 1), ".pth"]))
             
     #Domme pytorch heeft geen summary functie, dus je zou pytorchsummary kunnen pip installen als je wil zien, dan from pytorchsummary import summary en deze lijn:

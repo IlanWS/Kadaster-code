@@ -17,5 +17,5 @@ data_split_proportion = 0.2
 
 #Hyperparamers
 learning_rate = 0.001
-epochs = 100
+epochs = 20
 batch_size = 16
