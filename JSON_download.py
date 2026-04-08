@@ -8,6 +8,9 @@ print(requests.__version__)
 
 timeout_seconds = 5
 
+json_path = "".join([os.getcwd(),"/Data/JSON_files/apeldoorn_5000_stad.json"])
+input_folder = "".join([os.getcwd(),"/Data/Roadnetwork/apeldoorn_5000_stad"])
+
 def json_download(folder):
     if not os.path.exists(folder):
         os.makedirs(folder)

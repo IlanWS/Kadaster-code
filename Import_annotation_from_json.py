@@ -4,8 +4,9 @@ import numpy as np
 from PIL import Image, ImageDraw
 from config import *
 
-json_path = "".join([os.getcwd(),"/Data/JSON_files/annotation_labels.json"])
-output_dir = "".join([os.getcwd(),"/Data/Labels/Human_labels/"])
+json_path = "".join([os.getcwd(),"/Data/JSON_files/zutphen_1000_annotation.json"])
+output_dir = "".join([os.getcwd(),"/Data/Labels/zutphen_1000/"])
+
 
 def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
     with open(json_path, 'r') as f:
@@ -21,6 +22,7 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
 
     image_counter = 0
 
+
     for file_path, content in annotations_map.items():
         if len(content) < 2:
             continue
@@ -32,7 +34,7 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
         height = size_data.get('h', height)
 
         # Maak een zwart masker
-        mask = Image.new('L', (width, height), 0)
+        mask = Image.new('RGB', (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(mask)
 
         elements = anno_data.get('elts', [])
@@ -50,13 +52,21 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
                     
                     # Teken de specifieke polygoon (driehoek, ster, etc.) in plaats van een rectangle
                     if len(points_list) >= 3:
-                        draw.polygon(points_list, fill=255)
+                        draw.polygon(points_list, fill=(255, 255, 255))
                         has_labels = True
 
         if has_labels:
-            #output_name = f"image_{image_counter}.png"
-            mask.save(os.path.join(output_dir, file_path[101:]))
-            print(f"Opgeslagen: {file_path[101:]} (Exacte vorm van {file_path})")
+            output_name = os.path.basename(file_path).replace('.jpg', '.jpg')
+            mask.save(os.path.join(output_dir, output_name), format='JPEG')
+            print(f"Opgeslagen: {output_name} (Exacte vorm van {file_path})")
             image_counter += 1
 
 extract_rvimage_masks(json_path, output_dir)
+
+#voor de plaatjes zonder labels
+for i in range(300):
+    if not os.path.exists("".join([output_dir,"image_",str(i),".jpg"])):
+                mask = Image.new('RGB', (input_image_width, input_image_height), (0, 0, 0))
+                mask.save(os.path.join(output_dir, f"image_{i}.jpg"), format='JPEG')
+                print(i)
+
