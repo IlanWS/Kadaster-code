@@ -18,11 +18,11 @@ def compare_predictions():
         plt.subplot(3, 4, 2)
         plt.imshow(y_test[i])
         plt.title("Ground truth")
-        for epoch in range(epochs//2):
-            name = "".join([model_name, "_", str((epoch + 1) * 2)])
+        for epoch in range(10):
+            name = "".join([model_name, "_", str((epoch + 1) * (epochs // 10))])
             plt.subplot(3, 4, epoch + 3)
             plt.imshow(np.array(Image.open("".join([results_folder, model_name,"/", name,"/prediction_",str(i),".png"]))))
-            plt.title("Epochs: " + str((epoch + 1) * 2))
+            plt.title("Epochs: " + str((epoch + 1) * (epochs // 10)))
         plt.savefig("".join([results_folder,model_name,"/Comparisons/compare_",str(i),".png"]))
         plt.clf()
 

@@ -11,8 +11,8 @@ if __name__ == '__main__':
 
     #make predictions and save them as images
     #callt de hele tijd data split, heel inefficient
-    for epoch in range(epochs//2):
-        name = "".join([model_name, "_", str((epoch+1)*2)])
+    for epoch in range(10):
+        name = "".join([model_name, "_", str((epoch+1)*(epochs//10))])
         visualize_results(name)
 
     compare_predictions()
