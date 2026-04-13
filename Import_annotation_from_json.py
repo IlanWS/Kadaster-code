@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from config import *
 
-name = "zutphen_1000"
+name = "apeldoorn_5000_land"
 
 json_path = "".join([os.getcwd(),"/Data/JSON_files/deventer_2500_land_annotation.json"])
 output_dir = "".join([os.getcwd(),"/Data/Labels/", name, "/"])
