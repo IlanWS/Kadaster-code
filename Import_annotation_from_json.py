@@ -1,13 +1,15 @@
 import json
 import os
+import shutil
 import numpy as np
 from PIL import Image, ImageDraw
 from config import *
 
-name = "apeldoorn_5000_land"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+name = "combined"
 
-json_path = "".join([os.getcwd(),"/Data/JSON_files/deventer_2500_land_annotation.json"])
-output_dir = "".join([os.getcwd(),"/Data/Labels/", name, "/"])
+json_path = os.path.join(BASE_DIR, 'Data', 'JSON_files', 'deventer_2500_land_annotation.json')
+output_dir = os.path.join(BASE_DIR, 'Data', 'Roadnetwork', name) #change to "Labels" to make labels combined
 
 
 def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
@@ -64,12 +66,73 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
                 print(f"Opgeslagen: {output_name} (Exacte vorm van {file_path})")
                 image_counter += 1
 
-extract_rvimage_masks(json_path, output_dir)
+#extract_rvimage_masks(json_path, output_dir)
+
+
+def combine_label_folders(source_root, output_dir, folder_sequence, start_points=None):
+    """Copy images from label subfolders into one destination folder.
+
+    Images are renamed to image_0, image_1, ... in the combined folder.
+    You can force a start index for any folder with start_points.
+    """
+    if start_points is None:
+        start_points = {}
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    current_index = 0
+    for folder_name in folder_sequence:
+        if folder_name in start_points:
+            current_index = start_points[folder_name]
+
+        folder_path = os.path.join(source_root, folder_name)
+        if not os.path.isdir(folder_path):
+            raise FileNotFoundError(f"Folder not found: {folder_path}")
+
+        image_files = sorted(
+            f for f in os.listdir(folder_path)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        )
+
+        for image_file in image_files:
+            src = os.path.join(folder_path, image_file)
+            extension = os.path.splitext(image_file)[1].lower() or '.jpg'
+            destination_name = f"image_{current_index}{extension}"
+            dst = os.path.join(output_dir, destination_name)
+            shutil.copy2(src, dst)
+            print(f"Copied {folder_name}/{image_file} -> {destination_name}")
+            current_index += 1
+
+    print(f"Combined images written to: {output_dir}")
+
+
+if __name__ == '__main__':
+    source_root = os.path.join(BASE_DIR, 'Data', 'Roadnetwork') #change to "Labels" to make labels combined
+    output_dir = os.path.join(source_root, 'combined')
+    folder_sequence = [
+        'zutphen_1000',
+        'deventer_2500_land',
+        'deventer_2500_stad',
+        'apeldoorn_5000_land',
+        'apeldoorn_5000_stad',
+    ]
+    start_points = {
+        'zutphen_1000': 0,
+        'deventer_2500_land': 300,
+        'deventer_2500_stad': 525,
+        'apeldoorn_5000_land': 750,
+        'apeldoorn_5000_stad': 975,
+    }
+
+    print('Combining label images into:', output_dir)
+    combine_label_folders(source_root, output_dir, folder_sequence, start_points)
 
 #voor de plaatjes zonder labels
-for i in range(225):
-    if not os.path.exists("".join([output_dir,"image_",str(i),".jpg"])):
-                mask = Image.new('RGB', (input_image_width, input_image_height), (0, 0, 0))
-                mask.save(os.path.join(output_dir, f"image_{i}.jpg"), format='JPEG')
-                print(i)
+#for i in range(225):
+#    if not os.path.exists("".join([output_dir,"image_",str(i),".jpg"])):
+#                mask = Image.new('RGB', (input_image_width, input_image_height), (0, 0, 0))
+#                mask.save(os.path.join(output_dir, f"image_{i}.jpg"), format='JPEG')
+#                print(i)
+
 
