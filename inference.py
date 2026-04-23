@@ -41,27 +41,41 @@ def inference(json_path, index=0):
     
     if index >= len(data):
         print(f"Error: Index {index} out of range. JSON contains {len(data)} items.")
-        return None, None
+        return None, None, None
     
     url = data[index].get("URL")
     if not url:
         print(f"Error: No URL found at index {index}")
-        return None, None
+        return None, None, None
     
     # Download image directly from URL instead of reading from local disk
     image = download_image_from_url(url)
     if image is None:
         print(f"Error: Failed to download image from URL")
-        return None, None
+        return None, None, None
     
-    image_array = np.array(image)
-    input_image = np.delete(np.delete(np.delete(image_array, np.s_[input_image_height::], 0),np.s_[input_image_width::], 1),np.s_[3::], 2)
+    # Store original dimensions
+    original_width, original_height = image.size
+    print(f"Original image size: {original_width}x{original_height}")
+    
+    # Resize image to config dimensions for inference
+    image_resized = image.resize((input_image_width, input_image_height), Image.LANCZOS)
+    
+    image_array = np.array(image_resized)
+    
+    # Handle RGB/RGBA conversion
+    if image_array.shape[2] == 4:
+        # Remove alpha channel
+        input_image = image_array[:, :, :3]
+    else:
+        input_image = image_array
+    
     input_image = np.expand_dims(input_image, axis=0)
 
-    input_image = np.mean(input_image, axis = 3, keepdims = True)
+    input_image = np.mean(input_image, axis=3, keepdims=True)
     input_image[input_image<128] = 0
     input_image[input_image>=128] = 1
-    input_image = np.array(input_image, dtype = int)
+    input_image = np.array(input_image, dtype=int)
 
     # Convert test data to tensor
     test_input_pt = torch.from_numpy(input_image).permute(0, 3, 1, 2).float()
@@ -91,9 +105,14 @@ def inference(json_path, index=0):
     # Concatenate all predictions and convert to numpy
     predictions = torch.cat(predictions_list, dim=0).numpy().transpose(0, 2, 3, 1)
 
+    # Resize predictions back to original image dimensions
+    predictions_resized = Image.fromarray((predictions[0, :, :, 0] * 255).astype(np.uint8))
+    predictions_resized = predictions_resized.resize((original_width, original_height), Image.LANCZOS)
+    predictions_resized = np.array(predictions_resized) / 255.0
+    
     #als we binaire output willen ipv heatmap, gebruik volgende lijn.
     #predictions = (predictions > 0.5).astype(np.uint8)
-    return predictions[0], start_time
+    return predictions_resized, start_time, (original_width, original_height)
 
 
 
@@ -108,12 +127,20 @@ def polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5):
     width = int(query['WIDTH'])
     height = int(query['HEIGHT'])
 
-    img, start_time = inference(json_path, image_index)
+    img, start_time, original_dims = inference(json_path, image_index)
     if img is None:
         print("Error: Inference failed")
         return
     
-    arr = img[:,:,0]
+    if original_dims is None:
+        print("Error: Could not get original image dimensions")
+        return
+    
+    original_width, original_height = original_dims
+    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
+    
+    # Use the prediction directly (already resized back to original dimensions)
+    arr = img
 
     if arr.ndim == 3 and arr.shape[2] == 4:
         mask_arr = arr[:, :, 3]
@@ -127,9 +154,9 @@ def polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5):
 
     binary = (mask_arr > int(threshold * 255)).astype(np.uint8)
 
-    # Compute georeferenced transform
-    pixel_width = (maxx - minx) / width
-    pixel_height = (maxy - miny) / height
+    # Compute georeferenced transform using original image dimensions
+    pixel_width = (maxx - minx) / original_width
+    pixel_height = (maxy - miny) / original_height
     transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
     
     end_time = time.time()
@@ -160,7 +187,7 @@ def polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5):
                 shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
 
 
-name= "keizer"
+name= "heel"
 # Example usage:
 json_path = "".join(["C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Data\\JSON_files\\", name, ".json"])
 shapefile_path = "".join(["prediction_",name,".shp"])
