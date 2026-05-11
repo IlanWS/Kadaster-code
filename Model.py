@@ -248,16 +248,30 @@ class StackedHourglassRoadLabeler(nn.Module):
 
 
 
-def compile_model():
+def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name=model_name, intermidiate_saves=True):
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
-    #model = DeepLabRoadLabeler(1, use_aux=False)
-    model = StackedHourglassRoadLabeler(1)
+    if model_name.lower().startswith("deeplab"):
+        model = DeepLabRoadLabeler(1, use_aux=False)
+        learning_rate = 0.00002
+        batch_size = 16
+    elif model_name.lower().startswith("stackedhourglass"):
+        model = StackedHourglassRoadLabeler(1)
+        learning_rate = 0.00002
+        batch_size = 16
+    elif model_name.lower().startswith("unet"):
+        model = UNetRoadLabeler(1, 1)
+        learning_rate = 0.0006
+        batch_size = 32
+    else:
+        print("not a valid model name, check config.py")
+        exit(1)
 
     #Here you should use device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
+    print(f"Using device: {device}")
     #try focal cross entropy
-    criterion = torch.nn.BCELoss()
+    criterion = dice_bce_loss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
     x_train, y_train, x_test, y_test = data_split()
@@ -273,6 +287,7 @@ def compile_model():
     if not os.path.isdir(model_path):
         os.makedirs(model_path)
     print("start training")
+
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -294,15 +309,17 @@ def compile_model():
                 outputs = model(inputs)
                 val_loss += criterion(outputs, masks).item()
 
-        print(
-            f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
+        print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
 
-        if (epoch + 1) % (epochs // 10) == 0:
+        if intermidiate_saves:
+            if (epoch + 1) % (epochs // 10) == 0 and epoch + 1 != epochs:
+                torch.save(model.state_dict(), "".join([model_path, model_name,"_", str(epoch + 1), ".pth"]))
+
+        if epoch == epochs - 1:
             torch.save(model.state_dict(), "".join([model_path, model_name,"_", str(epoch + 1), ".pth"]))
-            
     #Domme pytorch heeft geen summary functie, dus je zou pytorchsummary kunnen pip installen als je wil zien, dan from pytorchsummary import summary en deze lijn:
     #summary(model, input_size=(1, 512, 512))
-    return
+    return x_train, y_train, x_test, y_test
 
 
 

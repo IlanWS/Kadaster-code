@@ -13,10 +13,10 @@ results_folder = "".join([os.getcwd(),"/Data/Predictions/"])
 
 input_image_height = 360
 input_image_width = 640
-number_of_data_pairs = 1200
+number_of_data_pairs = 100
 data_split_proportion = 0.2
 
 #Hyperparamers
 learning_rate = 0.001
-epochs = 100
+epochs = 10
 batch_size = 32 #16 might be needed for some models

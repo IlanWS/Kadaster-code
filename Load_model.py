@@ -6,14 +6,12 @@ import torch
 from torch.utils.data import DataLoader
 
 
-def predict_model(name):
+def predict_model(name, x_test):
     
     # Must match training architecture; we trained with use_aux=False
     #model = DeepLabRoadLabeler(1, use_aux=False)
     model = StackedHourglassRoadLabeler(1)
     model.load_state_dict(torch.load("".join([model_path,name, ".pth"])))
-    
-    x_train, y_train, x_test, y_test = data_split()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)

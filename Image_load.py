@@ -8,6 +8,7 @@ import numpy as np
 import os
 
 def load_images():
+    print("Image load")
     input_image_array = np.empty([number_of_data_pairs,input_image_height,input_image_width,3], dtype=np.int16)
     target_image_array = np.empty([number_of_data_pairs,input_image_height,input_image_width,3], dtype=np.int16)
 

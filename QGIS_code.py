@@ -1,6 +1,5 @@
 #run this script in QGIS to harvest images into a json file
 
-"""
 import time
 
 #huidige extent van de GUI
@@ -31,4 +30,3 @@ for i in range(25):
 
 #canvas.zoomByFactor(1.5)
 
-"""

@@ -1,6 +1,6 @@
 #Here we create a workflow to inference a shapefile from only the roadnetwork as input data
 #We start by running the input roadnetwork through the model, then we take the output and polygonize it add the geolocation data
-#we use the amsterdam image and the stacked hourglass model with 100 epochs
+#we use the amsterdam image and the stacked hourglass model with 50 epochs
 import requests
 import torch
 import time
@@ -25,7 +25,6 @@ def download_image_from_url(url, timeout_seconds=5):
         response = requests.get(url, timeout=timeout_seconds)
         if response.status_code == 200:
             image = Image.open(io.BytesIO(response.content))
-            print(f"Successfully downloaded image from URL")
             return image
         else:
             print(f"Error downloading from URL: Status {response.status_code}")
@@ -60,9 +59,16 @@ def inference(json_path, index=0):
         print(f"Error: Failed to download image from URL")
         return None, None, None
     
+    #load in model
+    model = StackedHourglassRoadLabeler(1)
+    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/stackedhourglass_dice_50.pth"]), map_location='cpu'))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    start_time = time.time()
+
     # Store original dimensions
     original_width, original_height = image.size
-    print(f"Original image size: {original_width}x{original_height}")
     
     # Resize image to config dimensions for inference
     image_resized = image.resize((input_image_width, input_image_height), Image.LANCZOS)
@@ -87,10 +93,7 @@ def inference(json_path, index=0):
     test_input_pt = torch.from_numpy(input_image).permute(0, 3, 1, 2).float()
     test_loader = DataLoader(test_input_pt, batch_size=1, shuffle=False)
 
-    # Load model
-    model = StackedHourglassRoadLabeler(1)
-    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/stackedhourglass_dice_50.pth"]), map_location='cpu'))
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # start inference
     model.to(device)
     model.eval()
 
@@ -98,7 +101,7 @@ def inference(json_path, index=0):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    start_time = time.time()
+    start_time_inference = time.time()
     # Process predictions in batches
     predictions_list = []
     with torch.no_grad():
@@ -107,6 +110,7 @@ def inference(json_path, index=0):
             batch_predictions = model(batch)
             predictions_list.append(batch_predictions.cpu())
 
+    end_time_inference = time.time()
     # Concatenate all predictions and convert to numpy
     predictions = torch.cat(predictions_list, dim=0).numpy().transpose(0, 2, 3, 1)
 
@@ -115,87 +119,12 @@ def inference(json_path, index=0):
     predictions_resized = predictions_resized.resize((original_width, original_height), Image.LANCZOS)
     predictions_resized = np.array(predictions_resized) / 255.0
 
-    plt.imshow(predictions_resized, cmap='gray')
-    plt.show()
-
     #als we binaire output willen ipv heatmap, gebruik volgende lijn.
     #predictions = (predictions > 0.5).astype(np.uint8)
-    return predictions_resized, start_time, (original_width, original_height)
+    return predictions_resized, start_time, (original_width, original_height), end_time_inference - start_time_inference
 
 
-
-def polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5):
-    # Load JSON for georeferencing info
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    query = data[0]['Query']
-    bbox = query['BBOX'].split('%2C')
-    minx, miny, maxx, maxy = map(float, bbox)
-    crs = query['CRS'].replace('%3A', ':')
-    width = int(query['WIDTH'])
-    height = int(query['HEIGHT'])
-
-    img, start_time, original_dims = inference(json_path, image_index)
-    if img is None:
-        print("Error: Inference failed")
-        return
-    
-    if original_dims is None:
-        print("Error: Could not get original image dimensions")
-        return
-    
-    original_width, original_height = original_dims
-    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
-    
-    # Use the prediction directly (already resized back to original dimensions)
-    arr = img
-
-    if arr.ndim == 3 and arr.shape[2] == 4:
-        mask_arr = arr[:, :, 3]
-    elif arr.ndim == 3:
-        mask_arr = np.mean(arr[:, :, :3], axis=2).astype(np.uint8)
-    else:
-        mask_arr = arr
-
-    if mask_arr.dtype != np.uint8:
-        mask_arr = (mask_arr * 255).astype(np.uint8)
-
-    binary = (mask_arr > int(threshold * 255)).astype(np.uint8)
-
-    # Compute georeferenced transform using original image dimensions
-    pixel_width = (maxx - minx) / original_width
-    pixel_height = (maxy - miny) / original_height
-    transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
-    
-    end_time = time.time()
-    print(f"Inference time: {end_time - start_time:.2f} seconds")
-    
-    schema = {
-        "geometry": "Polygon",
-        "properties": {"value": "int:10"},
-    }
-
-    with fiona.open(
-        shapefile_path,
-        mode="w",
-        driver="ESRI Shapefile",
-        schema=schema,
-        crs=crs,
-    ) as shp:
-        for geom, value in rasterio.features.shapes(binary, mask=binary, transform=transform):
-            if value == 1:
-                # Validate and fix invalid geometries
-                geom_shape = shape(geom)
-                if not geom_shape.is_valid:
-                    geom_shape = make_valid(geom_shape)
-                
-                if geom_shape.is_empty:
-                    continue
-                
-                shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
-
-
-def reshape(json_path, index=0):
+def get_labels(json_path, index=0):
     # Load JSON to get the image URL
     with open(json_path, 'r') as f:
         data = json.load(f)
@@ -222,7 +151,6 @@ def reshape(json_path, index=0):
     
     # Store original dimensions
     original_width, original_height = image.size
-    print(f"Original image size: {original_width}x{original_height}")
     
     # Resize image to config dimensions for inference
     image_resized = image.resize((input_image_width, input_image_height), Image.NEAREST)
@@ -255,71 +183,6 @@ def reshape(json_path, index=0):
     #predictions = (predictions > 0.5).astype(np.uint8)
     return predictions_resized, (original_width, original_height)
 
-def polygonize_label(json_path, shapefile_path, image_index=0, threshold=0.5):
-    # Load JSON for georeferencing info
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    query = data[0]['Query']
-    bbox = query['BBOX'].split('%2C')
-    minx, miny, maxx, maxy = map(float, bbox)
-    crs = query['CRS'].replace('%3A', ':')
-
-    img, original_dims = reshape(json_path, image_index)
-    if img is None:
-        print("Error: Inference failed")
-        return
-    
-    if original_dims is None:
-        print("Error: Could not get original image dimensions")
-        return
-    
-    original_width, original_height = original_dims
-    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
-    
-    # Use the prediction directly (already resized back to original dimensions)
-    arr = img
-
-    if arr.ndim == 3 and arr.shape[2] == 4:
-        mask_arr = arr[:, :, 3]
-    elif arr.ndim == 3:
-        mask_arr = np.mean(arr[:, :, :3], axis=2).astype(np.uint8)
-    else:
-        mask_arr = arr
-
-    if mask_arr.dtype != np.uint8:
-        mask_arr = (mask_arr * 255).astype(np.uint8)
-
-    binary = (mask_arr > int(threshold * 255)).astype(np.uint8)
-
-    # Compute georeferenced transform using original image dimensions
-    pixel_width = (maxx - minx) / original_width
-    pixel_height = (maxy - miny) / original_height
-    transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
-    
-    schema = {
-        "geometry": "Polygon",
-        "properties": {"value": "int:10"},
-    }
-
-    with fiona.open(
-        shapefile_path,
-        mode="w",
-        driver="ESRI Shapefile",
-        schema=schema,
-        crs=crs,
-    ) as shp:
-        for geom, value in rasterio.features.shapes(binary, mask=binary, transform=transform):
-            if value == 1:
-                # Validate and fix invalid geometries
-                geom_shape = shape(geom)
-                if not geom_shape.is_valid:
-                    geom_shape = make_valid(geom_shape)
-                
-                if geom_shape.is_empty:
-                    continue
-                
-                shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
-
 
 def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=0, prediction_threshold=0.5, alpha=0.0, prediction_shapefile_path=None):
     """
@@ -337,14 +200,14 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
     minx, miny, maxx, maxy = map(float, bbox)
     crs = query['CRS'].replace('%3A', ':')
 
-    # Get predictions (from model inference)
-    predictions_img, start_time, original_dims = inference(json_path, image_index)
+    # Get predictions (reshaped)
+    predictions_img, start_time, original_dims, inference_time = inference(json_path, image_index)
     if predictions_img is None:
         print("Error: Inference failed")
         return
     
     # Get labels (from raw input)
-    labels_img, label_dims = reshape(json_path, image_index)
+    labels_img, label_dims = get_labels(json_path, image_index)
     if labels_img is None:
         print("Error: Label loading failed")
         return
@@ -355,7 +218,6 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
     print(f"Using label dimensions: {label_width}x{label_height}")
     
     # Create binary masks
-    # Predictions
     pred_arr = predictions_img
     if pred_arr.ndim == 3:
         pred_mask = np.mean(pred_arr[:, :, :3], axis=2).astype(np.uint8)
@@ -365,7 +227,6 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         pred_mask = (pred_mask * 255).astype(np.uint8)
     binary_predictions = (pred_mask > int(prediction_threshold * 255)).astype(np.uint8)
     
-    # Labels
     label_arr = labels_img
     if label_arr.ndim == 3:
         label_mask = np.mean(label_arr[:, :, :3], axis=2).astype(np.uint8)
@@ -404,7 +265,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
     
     # Extract label geometries with overlap scores
     end_time = time.time()
-    print(f"Inference time: {end_time - start_time:.2f} seconds")
+    print(f"Total time: {end_time - start_time:.2f} seconds, Inference time: {inference_time:.2f} seconds")
     
     schema = {
         "geometry": "Polygon",
@@ -439,8 +300,6 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
                 if score >= alpha:
                     shp.write({"geometry": mapping(geom_shape), "properties": {"score": float(score)}})
     
-    print(f"Label shapefile with overlap scores written to: {label_shapefile_path}")
-    
     # Save prediction polygons if a path was provided
     if prediction_shapefile_path is not None:
         pred_schema = {
@@ -467,7 +326,6 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
                     
                     shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
         
-        print(f"Prediction shapefile written to: {prediction_shapefile_path}")
 
 
 name= "wijk"

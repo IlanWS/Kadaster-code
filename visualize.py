@@ -5,9 +5,7 @@ import numpy as np
 from PIL import Image
 
 
-def compare_predictions():
-    x_train, y_train, x_test, y_test = data_split()
-
+def compare_predictions(x_test, y_test):
     if not os.path.isdir("".join([results_folder,model_name,"/Comparisons"])):
         os.makedirs("".join([results_folder,model_name,"/Comparisons"]))
 
