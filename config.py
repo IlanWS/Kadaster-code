@@ -2,7 +2,7 @@ import os
 #Data specifications
 
 #chosen_model = UNetRoadLabeler(1, 1)
-model_name = "StackedHourglass_combined" #model_name should be the same as the name of the json file in the Data/JSON_files folder, and the same as the name of the folder in Data/Roadnetwork and Data/Labels, need to fix that
+model_name = "stackedhourglass" #model_name should be the same as the name of the json file in the Data/JSON_files folder, and the same as the name of the folder in Data/Roadnetwork and Data/Labels, need to fix that
 model_path = "".join([os.getcwd(),"/Models/",model_name,"/"])
 dataname = "combined"
 

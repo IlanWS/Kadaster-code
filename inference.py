@@ -12,7 +12,6 @@ import rasterio.features
 import fiona
 from shapely.geometry import shape, mapping
 from shapely.validation import make_valid
-from shapely.ops import unary_union
 import json
 import io
 import matplotlib.pyplot as plt
@@ -84,7 +83,7 @@ def inference(json_path, index=0):
 
     # Load model
     model = StackedHourglassRoadLabeler(1)
-    model.load_state_dict(torch.load("C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Models\\StackedHourglass_combined_100.pth", map_location='cpu'))
+    model.load_state_dict(torch.load("C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Models\\stackedhourglass_dice_50.pth", map_location='cpu'))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -198,12 +197,12 @@ def reshape(json_path, index=0):
     
     if index >= len(data):
         print(f"Error: Index {index} out of range. JSON contains {len(data)} items.")
-        return None, None, None
+        return None, None
     
     url = data[index].get("URL")
     if not url:
         print(f"Error: No URL found at index {index}")
-        return None, None, None
+        return None, None
     
     # Download image directly from URL instead of reading from local disk
     url = url.replace("localhost", "localhost:8080")
@@ -211,7 +210,7 @@ def reshape(json_path, index=0):
 
     if image is None:
         print(f"Error: Failed to download image from URL")
-        return None, None, None
+        return None, None
     
     # Store original dimensions
     original_width, original_height = image.size
@@ -314,7 +313,7 @@ def polygonize_label(json_path, shapefile_path, image_index=0, threshold=0.5):
                 shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
 
 
-def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=0, prediction_threshold=0.5, label_threshold=0.5, alpha=0.0, prediction_shapefile_path=None):
+def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=0, prediction_threshold=0.5, alpha=0.0, prediction_shapefile_path=None):
     """
     Generate label polygons with an overlap score attribute.
     The score represents the fraction of each label polygon that overlaps with prediction polygons.
@@ -345,7 +344,9 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         return
     
     original_width, original_height = original_dims
-    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
+    label_width, label_height = label_dims
+    print(f"Using prediction dimensions for georeference: {original_width}x{original_height}")
+    print(f"Using label dimensions: {label_width}x{label_height}")
     
     # Create binary masks
     # Predictions
@@ -366,16 +367,22 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         label_mask = label_arr
     if label_mask.dtype != np.uint8:
         label_mask = (label_mask * 255).astype(np.uint8)
-    binary_labels = (label_mask > int(label_threshold * 255)).astype(np.uint8)
+    binary_labels = (label_mask > int(0.5 * 255)).astype(np.uint8)
     
-    # Compute georeferenced transform
-    pixel_width = (maxx - minx) / original_width
-    pixel_height = (maxy - miny) / original_height
-    transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
+    # Compute georeferenced transforms for predictions and labels
+    # Predictions transform
+    pixel_width_pred = (maxx - minx) / original_width
+    pixel_height_pred = (maxy - miny) / original_height
+    transform_pred = Affine.translation(minx, maxy) * Affine.scale(pixel_width_pred, -pixel_height_pred)
+    
+    # Labels transform (using label dimensions for proper alignment)
+    pixel_width_label = (maxx - minx) / label_width
+    pixel_height_label = (maxy - miny) / label_height
+    transform_label = Affine.translation(minx, maxy) * Affine.scale(pixel_width_label, -pixel_height_label)
     
     # Extract prediction geometries and merge into single geometry
     prediction_polygons = []
-    for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform):
+    for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform_pred):
         if value == 1:
             geom_shape = shape(geom)
             if not geom_shape.is_valid:
@@ -405,7 +412,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         schema=schema,
         crs=crs,
     ) as shp:
-        for geom, value in rasterio.features.shapes(binary_labels, mask=binary_labels, transform=transform):
+        for geom, value in rasterio.features.shapes(binary_labels, mask=binary_labels, transform=transform_label):
             if value == 1:
                 geom_shape = shape(geom)
                 if not geom_shape.is_valid:
@@ -442,7 +449,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
             schema=pred_schema,
             crs=crs,
         ) as shp:
-            for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform):
+            for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform_pred):
                 if value == 1:
                     # Validate and fix invalid geometries
                     geom_shape = shape(geom)
@@ -459,9 +466,9 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
 
 name= "calslaan"
 # Example usage:
-alpha = 0.1
+alpha = 0.5
 json_path = "".join(["C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Data\\JSON_files\\", name, ".json"])
 label_path = "".join(["good_labels_",name,"_",str(alpha),".shp"])
 prediction_path = "".join(["predictions_",name,"_",str(alpha),".shp"])    
 # om te runnen moet de locale server draaien met mapfile met rand
-polygonize_with_overlap_scores(json_path, label_path, image_index=0, prediction_threshold=0.1, label_threshold=0.3, alpha=alpha, prediction_shapefile_path=prediction_path)
+polygonize_with_overlap_scores(json_path, label_path, image_index=0, prediction_threshold=0.5, alpha=alpha, prediction_shapefile_path=prediction_path)
