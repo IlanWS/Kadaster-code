@@ -1,7 +1,9 @@
-# Some different loss functions
+from config import *
+
 import torch
 from torch import nn
 
+# Some different loss functions
 class Adaptive_wing_loss(nn.Module):
     def __init__(self, omega=14, theta=0.5, epsilon=1, alpha=1):
         super(Adaptive_wing_loss, self).__init__()
@@ -32,7 +34,7 @@ class dice_bce_loss(nn.Module):
     
 # Prevents overfitting
 class EarlyStopping:
-    def __init__(self, patience=5, delta=0):
+    def __init__(self, patience=early_stopping_patience, delta=early_stopping_delta):
         self.patience = patience
         self.delta = delta
         self.best_score = None
