@@ -114,8 +114,7 @@ class DeepLabRoadLabeler(nn.Module):
         with torch.no_grad():
             self.network.backbone.conv1.weight[:] = old_conv.weight.sum(dim=1, keepdim=True)
 
-        # 3. Modify the Output Layer (Classifier)
-        # DeepLab's classifier is typically [Conv2d(2048, 256), Conv2d(256, num_classes)]
+        # DeepLab classifier is typically [Conv2d(2048, 256), Conv2d(256, num_classes)]
         # We replace just the final layer so we keep internal channels consistent.
         if hasattr(self.network, 'classifier') and len(self.network.classifier) >= 1:
             # If classifier is an nn.Sequential, try to replace last conv.
@@ -127,7 +126,6 @@ class DeepLabRoadLabeler(nn.Module):
             else:
                 self.network.classifier = nn.Conv2d(self.network.classifier.in_channels, output_channels, kernel_size=1)
 
-        # 4. Modify the Auxiliary Classifier
         # DeepLab uses an internal auxiliary arm during training to help convergence.
         if use_aux and self.network.aux_classifier is not None:
             from torchvision.models.segmentation.fcn import FCNHead
@@ -147,95 +145,6 @@ class DeepLabRoadLabeler(nn.Module):
         out = F.interpolate(result['out'], size=input_shape, mode='bilinear', align_corners=False)
         return torch.sigmoid(out)
 
-
-"""
-class DeepLabRoadLabeler(nn.Module):
-    def __init__(self, in_channels, out_channels=1):
-        super(DeepLabRoadLabeler, self).__init__()
-        def conv_block(in_feat, out_feat, kernel_size, padding, dilation, stride):
-            return nn.Sequential(
-                nn.Conv2d(in_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
-                nn.ReLU(inplace=True)
-            )
-        
-        def conv_block_deep(in_feat, out_feat, kernel_size, padding, dilation, stride):
-            return nn.Sequential(
-                nn.Conv2d(in_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_feat, out_feat, kernel_size=kernel_size, padding=padding, dilation=dilation, stride=stride),
-                nn.ReLU(inplace=True)
-            )
-        
-        self.f1 = conv_block(in_channels, 64, kernel_size=3, padding=1, dilation=1, stride=1)
-        self.p1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
-
-        self.f2 = conv_block(64, 128, kernel_size=3, padding=1, dilation=1, stride=1)
-        self.p2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
-
-        self.f3 = conv_block_deep(128, 256, kernel_size=3, padding=1, dilation=1, stride=1)
-        self.p3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
-
-        self.f4 = conv_block_deep(256, 512, kernel_size=3, padding=1, dilation=1, stride=1)
-        self.p4 = nn.MaxPool2d(kernel_size=2, stride=1, padding=1)
-
-        self.f5 = conv_block_deep(512, 512, kernel_size=3, padding=2, dilation=2, stride=1)
-        self.p5 = nn.MaxPool2d(kernel_size=1, stride=2, padding=1)
-
-        self.avg_pool = nn.AdaptiveAvgPool2d(kernel_size=3, stride=1, padding=1)
-
-
-        # Bottleneck
-        self.bottleneck = conv_block(256, 512)
-
-        # Decoder (Upsampling)
-        self.u3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.dec3 = conv_block(512, 256) # 512 because of concatenation (256+256)
-
-        self.u2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.dec2 = conv_block(256, 128) # 128+128
-
-        self.u1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.dec1 = conv_block(128, 64)   # 64+64
-
-        # Final Output Layer
-        self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        # Encoder
-        print("forward")
-        f1 = self.f1(x)
-        p1 = self.p1(f1)
-
-        f2 = self.f2(p1)
-        p2 = self.p2(f2)
-
-        f3 = self.f3(p2)
-        p3 = self.p3(f3)
-
-        # Bottleneck
-        bn = self.bottleneck(p3)
-
-        # Decoder
-        u3 = self.u3(bn)
-        u3 = torch.cat([u3, f3], dim=1) # Skip connection
-        f4 = self.dec3(u3)
-
-        u2 = self.u2(f4)
-        u2 = torch.cat([u2, f2], dim=1) # Skip connection
-        f5 = self.dec2(u2)
-
-        u1 = self.u1(f5)
-        u1 = torch.cat([u1, f1], dim=1) # Skip connection
-        f6 = self.dec1(u1)
-
-        outputs = self.final_conv(f6)
-        return self.sigmoid(outputs)
-"""
 
 
 class Residual(nn.Module):

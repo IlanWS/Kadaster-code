@@ -3,7 +3,6 @@
 #we use the amsterdam image and the stacked hourglass model with 100 epochs
 import requests
 import torch
-import matplotlib.pyplot as plt
 import time
 import numpy as np
 from PIL import Image
@@ -13,8 +12,10 @@ import rasterio.features
 import fiona
 from shapely.geometry import shape, mapping
 from shapely.validation import make_valid
+from shapely.ops import unary_union
 import json
 import io
+import matplotlib.pyplot as plt
 
 from Model import *
 from config import *
@@ -109,7 +110,10 @@ def inference(json_path, index=0):
     predictions_resized = Image.fromarray((predictions[0, :, :, 0] * 255).astype(np.uint8))
     predictions_resized = predictions_resized.resize((original_width, original_height), Image.LANCZOS)
     predictions_resized = np.array(predictions_resized) / 255.0
-    
+
+    plt.imshow(predictions_resized, cmap='gray')
+    plt.show()
+
     #als we binaire output willen ipv heatmap, gebruik volgende lijn.
     #predictions = (predictions > 0.5).astype(np.uint8)
     return predictions_resized, start_time, (original_width, original_height)
@@ -187,10 +191,277 @@ def polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5):
                 shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
 
 
-name= "heel"
-# Example usage:
-json_path = "".join(["C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Data\\JSON_files\\", name, ".json"])
-shapefile_path = "".join(["prediction_",name,".shp"])
+def reshape(json_path, index=0):
+    # Load JSON to get the image URL
+    with open(json_path, 'r') as f:
+        data = json.load(f)
     
+    if index >= len(data):
+        print(f"Error: Index {index} out of range. JSON contains {len(data)} items.")
+        return None, None, None
+    
+    url = data[index].get("URL")
+    if not url:
+        print(f"Error: No URL found at index {index}")
+        return None, None, None
+    
+    # Download image directly from URL instead of reading from local disk
+    url = url.replace("localhost", "localhost:8080")
+    image = download_image_from_url(url)
+
+    if image is None:
+        print(f"Error: Failed to download image from URL")
+        return None, None, None
+    
+    # Store original dimensions
+    original_width, original_height = image.size
+    print(f"Original image size: {original_width}x{original_height}")
+    
+    # Resize image to config dimensions for inference
+    image_resized = image.resize((input_image_width, input_image_height), Image.NEAREST)
+    
+    image_array = np.array(image_resized)
+
+    # Handle RGB/RGBA conversion
+    if image_array.shape[2] == 4:
+        # Remove alpha channel
+        input_image = image_array[:, :, :3]
+    else:
+        input_image = image_array
+    
+    input_image = np.expand_dims(input_image, axis=0)
+
+    input_image = np.mean(input_image, axis=3, keepdims=True)
+
+    input_image[input_image<10] = 0
+    input_image[input_image>=10] = 1
+    input_image = np.array(input_image, dtype=int)
+    
+    predictions = input_image
+
+    # Resize predictions back to original image dimensions
+    predictions_resized = Image.fromarray((predictions[0, :, :, 0] * 255).astype(np.uint8))
+    predictions_resized = predictions_resized.resize((original_width, original_height), Image.NEAREST)
+    predictions_resized = np.array(predictions_resized) / 255.0
+    
+    #als we binaire output willen ipv heatmap, gebruik volgende lijn.
+    #predictions = (predictions > 0.5).astype(np.uint8)
+    return predictions_resized, (original_width, original_height)
+
+def polygonize_label(json_path, shapefile_path, image_index=0, threshold=0.5):
+    # Load JSON for georeferencing info
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    query = data[0]['Query']
+    bbox = query['BBOX'].split('%2C')
+    minx, miny, maxx, maxy = map(float, bbox)
+    crs = query['CRS'].replace('%3A', ':')
+
+    img, original_dims = reshape(json_path, image_index)
+    if img is None:
+        print("Error: Inference failed")
+        return
+    
+    if original_dims is None:
+        print("Error: Could not get original image dimensions")
+        return
+    
+    original_width, original_height = original_dims
+    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
+    
+    # Use the prediction directly (already resized back to original dimensions)
+    arr = img
+
+    if arr.ndim == 3 and arr.shape[2] == 4:
+        mask_arr = arr[:, :, 3]
+    elif arr.ndim == 3:
+        mask_arr = np.mean(arr[:, :, :3], axis=2).astype(np.uint8)
+    else:
+        mask_arr = arr
+
+    if mask_arr.dtype != np.uint8:
+        mask_arr = (mask_arr * 255).astype(np.uint8)
+
+    binary = (mask_arr > int(threshold * 255)).astype(np.uint8)
+
+    # Compute georeferenced transform using original image dimensions
+    pixel_width = (maxx - minx) / original_width
+    pixel_height = (maxy - miny) / original_height
+    transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
+    
+    schema = {
+        "geometry": "Polygon",
+        "properties": {"value": "int:10"},
+    }
+
+    with fiona.open(
+        shapefile_path,
+        mode="w",
+        driver="ESRI Shapefile",
+        schema=schema,
+        crs=crs,
+    ) as shp:
+        for geom, value in rasterio.features.shapes(binary, mask=binary, transform=transform):
+            if value == 1:
+                # Validate and fix invalid geometries
+                geom_shape = shape(geom)
+                if not geom_shape.is_valid:
+                    geom_shape = make_valid(geom_shape)
+                
+                if geom_shape.is_empty:
+                    continue
+                
+                shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
+
+
+def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=0, prediction_threshold=0.5, label_threshold=0.5, alpha=0.0, prediction_shapefile_path=None):
+    """
+    Generate label polygons with an overlap score attribute.
+    The score represents the fraction of each label polygon that overlaps with prediction polygons.
+    Only polygons with score >= alpha are written to the output shapefile.
+    
+    If prediction_shapefile_path is provided, also saves the polygonized model predictions to that path.
+    """
+    from shapely.ops import unary_union
+    
+    # Load JSON for georeferencing info
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    query = data[0]['Query']
+    bbox = query['BBOX'].split('%2C')
+    minx, miny, maxx, maxy = map(float, bbox)
+    crs = query['CRS'].replace('%3A', ':')
+
+    # Get predictions (from model inference)
+    predictions_img, start_time, original_dims = inference(json_path, image_index)
+    if predictions_img is None:
+        print("Error: Inference failed")
+        return
+    
+    # Get labels (from raw input)
+    labels_img, label_dims = reshape(json_path, image_index)
+    if labels_img is None:
+        print("Error: Label loading failed")
+        return
+    
+    original_width, original_height = original_dims
+    print(f"Using original dimensions for georeference: {original_width}x{original_height}")
+    
+    # Create binary masks
+    # Predictions
+    pred_arr = predictions_img
+    if pred_arr.ndim == 3:
+        pred_mask = np.mean(pred_arr[:, :, :3], axis=2).astype(np.uint8)
+    else:
+        pred_mask = pred_arr
+    if pred_mask.dtype != np.uint8:
+        pred_mask = (pred_mask * 255).astype(np.uint8)
+    binary_predictions = (pred_mask > int(prediction_threshold * 255)).astype(np.uint8)
+    
+    # Labels
+    label_arr = labels_img
+    if label_arr.ndim == 3:
+        label_mask = np.mean(label_arr[:, :, :3], axis=2).astype(np.uint8)
+    else:
+        label_mask = label_arr
+    if label_mask.dtype != np.uint8:
+        label_mask = (label_mask * 255).astype(np.uint8)
+    binary_labels = (label_mask > int(label_threshold * 255)).astype(np.uint8)
+    
+    # Compute georeferenced transform
+    pixel_width = (maxx - minx) / original_width
+    pixel_height = (maxy - miny) / original_height
+    transform = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
+    
+    # Extract prediction geometries and merge into single geometry
+    prediction_polygons = []
+    for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform):
+        if value == 1:
+            geom_shape = shape(geom)
+            if not geom_shape.is_valid:
+                geom_shape = make_valid(geom_shape)
+            if not geom_shape.is_empty:
+                prediction_polygons.append(geom_shape)
+    
+    # Merge all prediction polygons
+    if prediction_polygons:
+        all_predictions = unary_union(prediction_polygons)
+    else:
+        all_predictions = None
+    
+    # Extract label geometries with overlap scores
+    end_time = time.time()
+    print(f"Inference time: {end_time - start_time:.2f} seconds")
+    
+    schema = {
+        "geometry": "Polygon",
+        "properties": {"score": "float:10.6"},
+    }
+
+    with fiona.open(
+        label_shapefile_path,
+        mode="w",
+        driver="ESRI Shapefile",
+        schema=schema,
+        crs=crs,
+    ) as shp:
+        for geom, value in rasterio.features.shapes(binary_labels, mask=binary_labels, transform=transform):
+            if value == 1:
+                geom_shape = shape(geom)
+                if not geom_shape.is_valid:
+                    geom_shape = make_valid(geom_shape)
+                if geom_shape.is_empty:
+                    continue
+                
+                # Calculate overlap score
+                if all_predictions is not None:
+                    intersection = geom_shape.intersection(all_predictions)
+                    intersection_area = intersection.area
+                    label_area = geom_shape.area
+                    score = intersection_area / label_area if label_area > 0 else 0.0
+                else:
+                    score = 0.0
+                
+                # Only write if score meets threshold
+                if score >= alpha:
+                    shp.write({"geometry": mapping(geom_shape), "properties": {"score": float(score)}})
+    
+    print(f"Label shapefile with overlap scores written to: {label_shapefile_path}")
+    
+    # Save prediction polygons if a path was provided
+    if prediction_shapefile_path is not None:
+        pred_schema = {
+            "geometry": "Polygon",
+            "properties": {"value": "int:10"},
+        }
+        
+        with fiona.open(
+            prediction_shapefile_path,
+            mode="w",
+            driver="ESRI Shapefile",
+            schema=pred_schema,
+            crs=crs,
+        ) as shp:
+            for geom, value in rasterio.features.shapes(binary_predictions, mask=binary_predictions, transform=transform):
+                if value == 1:
+                    # Validate and fix invalid geometries
+                    geom_shape = shape(geom)
+                    if not geom_shape.is_valid:
+                        geom_shape = make_valid(geom_shape)
+                    
+                    if geom_shape.is_empty:
+                        continue
+                    
+                    shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
+        
+        print(f"Prediction shapefile written to: {prediction_shapefile_path}")
+
+
+name= "calslaan"
+# Example usage:
+alpha = 0.1
+json_path = "".join(["C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Data\\JSON_files\\", name, ".json"])
+label_path = "".join(["good_labels_",name,"_",str(alpha),".shp"])
+prediction_path = "".join(["predictions_",name,"_",str(alpha),".shp"])    
 # om te runnen moet de locale server draaien met mapfile met rand
-polygonize_results(json_path, shapefile_path, image_index=0, threshold=0.5)
+polygonize_with_overlap_scores(json_path, label_path, image_index=0, prediction_threshold=0.1, label_threshold=0.3, alpha=alpha, prediction_shapefile_path=prediction_path)
