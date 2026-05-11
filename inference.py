@@ -15,6 +15,7 @@ from shapely.validation import make_valid
 import json
 import io
 import matplotlib.pyplot as plt
+from shapely.ops import unary_union
 
 from Model import *
 from config import *
@@ -28,9 +29,11 @@ def download_image_from_url(url, timeout_seconds=5):
             return image
         else:
             print(f"Error downloading from URL: Status {response.status_code}")
+            print(f"URL: {url}")
             return None
     except Exception as e:
         print(f"Error downloading from URL: {e}")
+        print(f"URL: {url}")
         return None
 
 
@@ -49,6 +52,9 @@ def inference(json_path, index=0):
         return None, None, None
     
     # Download image directly from URL instead of reading from local disk
+    if url.startswith("http://localhost:8080/"):
+        url = url.replace("localhost:8080/", "localhost/")
+
     image = download_image_from_url(url)
     if image is None:
         print(f"Error: Failed to download image from URL")
@@ -83,8 +89,7 @@ def inference(json_path, index=0):
 
     # Load model
     model = StackedHourglassRoadLabeler(1)
-    model.load_state_dict(torch.load("C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Models\\stackedhourglass_dice_50.pth", map_location='cpu'))
-
+    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/stackedhourglass_dice_50.pth"]), map_location='cpu'))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()
@@ -205,7 +210,10 @@ def reshape(json_path, index=0):
         return None, None
     
     # Download image directly from URL instead of reading from local disk
-    url = url.replace("localhost", "localhost:8080")
+    
+    if url.startswith("http://localhost/"):
+        url = url.replace("localhost/", "localhost:8080/")
+
     image = download_image_from_url(url)
 
     if image is None:
@@ -320,9 +328,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
     Only polygons with score >= alpha are written to the output shapefile.
     
     If prediction_shapefile_path is provided, also saves the polygonized model predictions to that path.
-    """
-    from shapely.ops import unary_union
-    
+    """    
     # Load JSON for georeferencing info
     with open(json_path, 'r') as f:
         data = json.load(f)
@@ -464,11 +470,15 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         print(f"Prediction shapefile written to: {prediction_shapefile_path}")
 
 
-name= "calslaan"
+name= "wijk"
 # Example usage:
 alpha = 0.5
-json_path = "".join(["C:\\Users\\SmeerdijkIlan\\Documents\\Master_thesis_opdracht\\Data\\JSON_files\\", name, ".json"])
-label_path = "".join(["good_labels_",name,"_",str(alpha),".shp"])
-prediction_path = "".join(["predictions_",name,"_",str(alpha),".shp"])    
+
+output_path = "".join([os.getcwd(), "/New_Labels/"])
+if not os.path.isdir(output_path):
+    os.makedirs(output_path)
+json_path = "".join([os.getcwd(), "/Data/JSON_files/", name, ".json"])
+label_path = "".join([output_path, name, "_labels_", str(alpha), ".shp"])
+prediction_path = "".join([output_path, name, "_prediction_", str(alpha), ".shp"])
 # om te runnen moet de locale server draaien met mapfile met rand
 polygonize_with_overlap_scores(json_path, label_path, image_index=0, prediction_threshold=0.5, alpha=alpha, prediction_shapefile_path=prediction_path)
