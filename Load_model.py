@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 
 def predict_model(name, x_test):
-    
+    # Basically the same as compile_model, but with pretrained models
     # Must match training architecture; we trained with use_aux=False
     #model = DeepLabRoadLabeler(1, use_aux=False)
     model = StackedHourglassRoadLabeler(1)
@@ -17,14 +17,10 @@ def predict_model(name, x_test):
     model.to(device)
     model.eval()
 
-    # Convert test data to tensor
     test_input_pt = torch.from_numpy(x_test).permute(0, 3, 1, 2).float()
     test_loader = DataLoader(test_input_pt, batch_size=batch_size, shuffle=False)
-
-    # Clear GPU cache to free fragmented memory
     torch.cuda.empty_cache()
 
-    # Process predictions in batches
     predictions_list = []
     with torch.no_grad():
         for batch in test_loader:

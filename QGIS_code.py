@@ -1,5 +1,4 @@
 #run this script in QGIS to harvest images into a json file
-
 import time
 
 #huidige extent van de GUI

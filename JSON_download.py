@@ -1,8 +1,10 @@
+from config import *
+
 #only needs to be ran if new data must be obtained from QGIS through the WSL server
 import json
 import os.path
 import requests
-from config import *
+
 
 print(requests.__version__)
 

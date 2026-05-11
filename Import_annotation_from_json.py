@@ -1,9 +1,9 @@
+from config import *
+
 import json
 import os
 import shutil
-import numpy as np
 from PIL import Image, ImageDraw
-from config import *
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 name = "combined"
@@ -19,8 +19,8 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Navigeer naar de annotaties map
-    # Structuur: tools_data_map -> Bbox -> annotations_map
+    # naar annotaties map
+    # tools_data_map -> Bbox -> annotations_map
     
     annotations_map = data['tools_data_map']["Bbox"]["specifics"]["Bbox"]['annotations_map']
 
@@ -38,7 +38,7 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
             width = size_data.get('w', width)
             height = size_data.get('h', height)
 
-            # Maak een zwart masker
+            # make empty mask
             mask = Image.new('RGB', (width, height), (0, 0, 0))
             draw = ImageDraw.Draw(mask)
 
@@ -49,13 +49,13 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
                 if 'Poly' in elt:
                     poly_data = elt['Poly']
                     
-                    # Haal de x,y punten op en zet ze in een lijst van tuples: [(x1, y1), (x2, y2), ...]
+                    # take x and y coordinates and turn into points
                     if 'points' in poly_data:
                         points_list = []
                         for p in poly_data['points']:
                             points_list.append((p['x'], p['y']))
                         
-                        # Teken de specifieke polygoon (driehoek, ster, etc.) in plaats van een rectangle
+                        #make polygon
                         if len(points_list) >= 3:
                             draw.polygon(points_list, fill=(255, 255, 255))
                             has_labels = True
@@ -107,32 +107,25 @@ def combine_label_folders(source_root, output_dir, folder_sequence, start_points
     print(f"Combined images written to: {output_dir}")
 
 
-if __name__ == '__main__':
-    source_root = os.path.join(BASE_DIR, 'Data', 'Roadnetwork') #change to "Labels" to make labels combined
+def extract():
+    source_root = os.path.join(BASE_DIR, 'Data', 'Roadnetwork')
     output_dir = os.path.join(source_root, 'combined')
-    folder_sequence = [
-        'zutphen_1000',
-        'deventer_2500_land',
-        'deventer_2500_stad',
-        'apeldoorn_5000_land',
-        'apeldoorn_5000_stad',
-    ]
-    start_points = {
-        'zutphen_1000': 0,
-        'deventer_2500_land': 300,
-        'deventer_2500_stad': 525,
-        'apeldoorn_5000_land': 750,
-        'apeldoorn_5000_stad': 975,
-    }
+    folder_sequence = ['zutphen_1000','deventer_2500_land','deventer_2500_stad','apeldoorn_5000_land','apeldoorn_5000_stad']
+    #numbers are the number of images in the folder, taken as index, so image names are right.
+    start_points = {'zutphen_1000': 0,'deventer_2500_land': 300,'deventer_2500_stad': 525,'apeldoorn_5000_land': 750,'apeldoorn_5000_stad': 975,
+                    }
 
     print('Combining label images into:', output_dir)
     combine_label_folders(source_root, output_dir, folder_sequence, start_points)
 
-#voor de plaatjes zonder labels
-#for i in range(225):
-#    if not os.path.exists("".join([output_dir,"image_",str(i),".jpg"])):
-#                mask = Image.new('RGB', (input_image_width, input_image_height), (0, 0, 0))
-#                mask.save(os.path.join(output_dir, f"image_{i}.jpg"), format='JPEG')
-#                print(i)
+extract()
 
+#To create empty mask for images without labels on them, so number of data pairs stays the same
+"""
+for i in range(225):
+    if not os.path.exists("".join([output_dir,"image_",str(i),".jpg"])):
+                mask = Image.new('RGB', (input_image_width, input_image_height), (0, 0, 0))
+                mask.save(os.path.join(output_dir, f"image_{i}.jpg"), format='JPEG')
+                print(i)
+"""
 

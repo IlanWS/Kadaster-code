@@ -1,4 +1,4 @@
-# some different lossfunction (make own class in .py file to call in model .py file)
+# Some different loss functions
 import torch
 from torch import nn
 
@@ -22,11 +22,38 @@ class dice_bce_loss(nn.Module):
         super(dice_bce_loss, self).__init__()
 
     def forward(self, inputs, targets):
-        # BCE Loss - inputs are already sigmoid probabilities, so use BCELoss instead of BCEWithLogitsLoss
+        # inputs are already sigmoid probabilities, so dont use BCEWithLogitsLoss
         bce = nn.BCELoss()(inputs, targets)
 
-        # Dice Loss - inputs are already probabilities
-        probs = inputs  # No need to apply sigmoid again
-        intersection = (probs * targets).sum()
-        dice = 1 - (2. * intersection / (probs.sum() + targets.sum() + 1e-7))  # Add epsilon to avoid division by zero
+        #Dice Loss, inputs are probabilities
+        intersection = (inputs * targets).sum()
+        dice = 1 - (2. * intersection / (inputs.sum() + targets.sum() + 1e-7))  # Add epsilon to avoid division by zero
         return bce + dice
+    
+# Prevents overfitting
+class EarlyStopping:
+    def __init__(self, patience=5, delta=0):
+        self.patience = patience
+        self.delta = delta
+        self.best_score = None
+        self.early_stop = False
+        self.counter = 0
+        self.best_model_state = None
+
+    def __call__(self, val_loss, model):
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.best_model_state = model.state_dict()
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.best_model_state = model.state_dict()
+            self.counter = 0
+
+    def load_best_model(self, model):
+        model.load_state_dict(self.best_model_state)

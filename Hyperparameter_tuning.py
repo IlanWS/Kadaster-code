@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 for new_model_name in ["unet"]:
     if not os.path.isdir("".join([os.getcwd(),"/Data/Loss/", new_model_name])):
         os.makedirs("".join([os.getcwd(),"/Data/Loss/", new_model_name]))
+    #these ranges are based on preliminary tunings with along the log scale
     for hpt_lr in [0.0002, 0.0004, 0.0006, 0.0008]:
         for hpt_bs in [32]:
             print(f"Running {new_model_name} training with learning rate: {hpt_lr} and batch size: {hpt_bs}")

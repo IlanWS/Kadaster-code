@@ -13,6 +13,7 @@ from torchvision.models.segmentation import DeepLabV3_ResNet101_Weights
 class UNetRoadLabeler(nn.Module):
     def __init__(self, in_channels, out_channels=1):
         super(UNetRoadLabeler, self).__init__()
+        #this is one convolutional block, used both in the encoder and decoder
         def conv_block(in_feat, out_feat):
             return nn.Sequential(
                 nn.Conv2d(in_feat, out_feat, kernel_size=3, padding=1),
@@ -23,7 +24,7 @@ class UNetRoadLabeler(nn.Module):
                 nn.ReLU(inplace=True)
             )
         
-        # Encoder (Downsampling)
+        #encoder (downsampling)
         self.f1 = conv_block(in_channels, 64)
         self.p1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
@@ -33,25 +34,26 @@ class UNetRoadLabeler(nn.Module):
         self.f3 = conv_block(128, 256)
         self.p3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Bottleneck
+        #bottleneck
         self.bottleneck = conv_block(256, 512)
 
-        # Decoder (Upsampling)
+        #decoder (upsampling)
+        #convtranspose2d is de upsampling, daarna concatenation met de skip connection (in forard functie)
         self.u3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.dec3 = conv_block(512, 256) # 512 because of concatenation (256+256)
+        self.dec3 = conv_block(512, 256) #512 because of concatenation (256+256)
 
         self.u2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.dec2 = conv_block(256, 128) # 128+128
+        self.dec2 = conv_block(256, 128) 
 
         self.u1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.dec1 = conv_block(128, 64)   # 64+64
+        self.dec1 = conv_block(128, 64) 
 
-        # Final Output Layer
+        #classifier
         self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        # Encoder
+        #encoder
         print("forward")
         f1 = self.f1(x)
         p1 = self.p1(f1)
@@ -62,20 +64,20 @@ class UNetRoadLabeler(nn.Module):
         f3 = self.f3(p2)
         p3 = self.p3(f3)
 
-        # Bottleneck
+        #bottleneck
         bn = self.bottleneck(p3)
 
-        # Decoder
+        #decoder
         u3 = self.u3(bn)
-        u3 = torch.cat([u3, f3], dim=1) # Skip connection
+        u3 = torch.cat([u3, f3], dim=1) #skip
         f4 = self.dec3(u3)
 
         u2 = self.u2(f4)
-        u2 = torch.cat([u2, f2], dim=1) # Skip connection
+        u2 = torch.cat([u2, f2], dim=1) 
         f5 = self.dec2(u2)
 
         u1 = self.u1(f5)
-        u1 = torch.cat([u1, f1], dim=1) # Skip connection
+        u1 = torch.cat([u1, f1], dim=1) 
         f6 = self.dec1(u1)
 
         outputs = self.final_conv(f6)
@@ -85,9 +87,8 @@ class UNetRoadLabeler(nn.Module):
 class DeepLabRoadLabeler(nn.Module):
     def __init__(self, input_channels, output_channels=1, use_aux=True):
         super(DeepLabRoadLabeler, self).__init__()
-        # hele deeplab archi, met ResNet backbone, ook allemaal andere versies, nog even kijken
-
-        print("loading in")
+        #This is a whole deeplabv3 archi with resnet101 backbone. 
+        #hele deeplab archi, met ResNet backbone, ook allemaal andere versies, nog even kijken
         if os.path.isdir("".join([os.getcwd(), "/.cache/torch/hub/checkpoints/deeplabv3_resnet101_coco-586e9e4e.pth"])):
             model = DeepLabV3_ResNet101_Weights(pretrained=False)
             checkpoint = torch.load("".join([os.getcwd(), "/.cache/torch/hub/checkpoints/deeplabv3_resnet101_coco-586e9e4e.pth"]), map_location='cpu')
@@ -97,9 +98,8 @@ class DeepLabRoadLabeler(nn.Module):
             weights = DeepLabV3_ResNet101_Weights.DEFAULT
             self.network = models.segmentation.deeplabv3_resnet101(weights=weights)
         
-        print("loaded")
 
-        # ResNet wil 3 channels, geef hem 1 (of eig inputchannels maar dat is voor nu 1)
+        #ResNet wants 3 channels, but we give him 1 (number of input channels so 1 for now).
         old_conv = self.network.backbone.conv1
         self.network.backbone.conv1 = nn.Conv2d(
             input_channels, 
@@ -110,14 +110,13 @@ class DeepLabRoadLabeler(nn.Module):
             bias=False
         )
         
-        # averaging de pre-trained RGB weights.
+        #averaging de pre-trained RGB weights.
         with torch.no_grad():
             self.network.backbone.conv1.weight[:] = old_conv.weight.sum(dim=1, keepdim=True)
 
-        # DeepLab classifier is typically [Conv2d(2048, 256), Conv2d(256, num_classes)]
-        # We replace just the final layer so we keep internal channels consistent.
+        #DeepLab classifier is typically [Conv2d(2048, 256), Conv2d(256, num_classes)], replace just the final layer so we keep internal # of channels consistent.
         if hasattr(self.network, 'classifier') and len(self.network.classifier) >= 1:
-            # If classifier is an nn.Sequential, try to replace last conv.
+            #if classifier is an nn.Sequential, try to replace last conv.
             if isinstance(self.network.classifier, nn.Sequential):
                 last = list(self.network.classifier.children())[-1]
                 if isinstance(last, nn.Conv2d):
@@ -126,7 +125,7 @@ class DeepLabRoadLabeler(nn.Module):
             else:
                 self.network.classifier = nn.Conv2d(self.network.classifier.in_channels, output_channels, kernel_size=1)
 
-        # DeepLab uses an internal auxiliary arm during training to help convergence.
+        #use internal auxiliary arm during training to help convergence.
         if use_aux and self.network.aux_classifier is not None:
             from torchvision.models.segmentation.fcn import FCNHead
             self.network.aux_classifier = FCNHead(1024, output_channels)
@@ -134,20 +133,20 @@ class DeepLabRoadLabeler(nn.Module):
             self.network.aux_classifier = None
 
     def forward(self, x):
-        print("start forward")
-        input_shape = x.shape[-2:] # (360, 640) min kan ook weg
+        print("forward")
+        input_shape = x.shape[-2:] # is (360, 640) min kan ook weg (maar niet per se met andere input configs)
         
         # output van voorgecodeerde deeplab model
         result = self.network(x)
         
-        # Resize output back to original input size if the stride 
-        # caused a slight mismatch (e.g., 360 is not perfectly divisible by 32)
+        # resize output back to original input size if the stride caused a mismatch (360 is not divisible by 32)
         out = F.interpolate(result['out'], size=input_shape, mode='bilinear', align_corners=False)
         return torch.sigmoid(out)
 
 
 
 class Residual(nn.Module):
+    #smallest part of SHG model, couple of these make up one hourglass
     def __init__(self, in_channels, out_channels):
         super(Residual, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels // 2, kernel_size=1)
@@ -174,13 +173,14 @@ class Residual(nn.Module):
         return self.relu(out + identity)
 
 class Hourglass(nn.Module):
+    # Two of these make up the SHG model (actually num_stack, but that is 2 in this case bc of inference speed)
     def __init__(self, depth, channels):
         super(Hourglass, self).__init__()
         self.depth = depth
         self.up1 = Residual(channels, channels)
         self.low1 = nn.MaxPool2d(2, stride=2)
         self.low2 = Residual(channels, channels)
-        
+        #Kind of like an onion, as long as depth>1, it keeps making new hourglasses inside itself 
         if self.depth > 1:
             self.low3 = Hourglass(depth - 1, channels)
         else:
@@ -194,7 +194,7 @@ class Hourglass(nn.Module):
         low2 = self.low2(low1)
         low3 = self.low3(low2)
         low4 = self.low4(low3)
-        # Upsample to exactly match up1's spatial size to avoid odd/even mismatches
+        # to avoid mismatches
         up2 = F.interpolate(low4, size=up1.shape[-2:], mode='nearest')
         return up1 + up2
 
@@ -202,8 +202,8 @@ class StackedHourglassRoadLabeler(nn.Module):
     def __init__(self, input_channels, num_stacks=2, num_channels=128): #in geval van memory overflow, doe num_channels naar 64 ofzo
         super(StackedHourglassRoadLabeler, self).__init__()
         self.num_stacks = num_stacks
-        
-        #input channels gaat uit van 1, weet niet of die werkt met iets anders tbh
+        #Input channels is 1, have not tried with more yet
+        #Input channels gaat uit van 1, weet niet of die werkt met iets anders tbh
         self.pre = nn.Sequential(
             nn.Conv2d(input_channels, 64, kernel_size=7, stride=2, padding=3),
             nn.BatchNorm2d(64),
@@ -220,14 +220,14 @@ class StackedHourglassRoadLabeler(nn.Module):
                                                     nn.BatchNorm2d(num_channels),
                                                     nn.ReLU(inplace=True)) for i in range(num_stacks)])
         
-        # Heatmap prediction layers
+        #heatmap prediction layers
         self.outs = nn.ModuleList([nn.Conv2d(num_channels, 1, 1) for i in range(num_stacks)])
         self.merge_features = nn.ModuleList([nn.Conv2d(num_channels, num_channels, 1) for i in range(num_stacks)])
         self.merge_preds = nn.ModuleList([nn.Conv2d(1, num_channels, 1) for i in range(num_stacks)])
 
 
     def forward(self, x):
-        # x: (B, 1, 360, 640)
+        #(B, 1, 360, 640)
         print("forward")
         x = self.pre(x)
         combined_outputs = []
@@ -241,9 +241,9 @@ class StackedHourglassRoadLabeler(nn.Module):
             if i < self.num_stacks - 1:
                 x = x + self.merge_features[i](feature) + self.merge_preds[i](preds)
         
-        # Resize final predictions to original 360x640
-        final_outputs = [F.interpolate(o, size=(360, 640), mode='bilinear') for o in combined_outputs]
-        # Use final stage output for loss and inference
+        #Resize final predictions to original 360x640
+        final_outputs = [F.interpolate(o, size=(input_image_height, input_image_width), mode='bilinear') for o in combined_outputs]
+        #Sigmoid for continuous output
         return torch.sigmoid(final_outputs[-1])
 
 
@@ -251,6 +251,7 @@ class StackedHourglassRoadLabeler(nn.Module):
 def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name=model_name, intermidiate_saves=True):
     #number of channels of the input is 1 (binary image), parameter should be changed when working with colour images (channels = 3 for RGB image)
     if model_name.lower().startswith("deeplab"):
+        #result of hyperparameter tuning
         model = DeepLabRoadLabeler(1, use_aux=False)
         learning_rate = 0.00002
         batch_size = 16
@@ -266,13 +267,15 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
         print("not a valid model name, check config.py")
         exit(1)
 
-    #Here you should use device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
+    #device = torch.device("xpu" if torch.xpu.is_available() else "cpu") if you use don't use NVIDIA
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     print(f"Using device: {device}")
+    
     #try focal cross entropy
     criterion = dice_bce_loss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    early_stopping = EarlyStopping()
     
     x_train, y_train, x_test, y_test = data_split()
 
@@ -288,6 +291,7 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
         os.makedirs(model_path)
     print("start training")
 
+    #start training model
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -300,7 +304,8 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-
+    
+    #evaluate training and validation loss in each epoch
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
@@ -311,6 +316,13 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
 
         print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
 
+        early_stopping(val_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping at epoch:", epoch + 1)
+            torch.save(early_stopping.load_best_model(model), "".join([model_path, model_name, "_", str(epoch + 1), ".pth"]))
+            break
+
+        #decided in main
         if intermidiate_saves:
             if (epoch + 1) % (epochs // 10) == 0 and epoch + 1 != epochs:
                 torch.save(model.state_dict(), "".join([model_path, model_name,"_", str(epoch + 1), ".pth"]))
