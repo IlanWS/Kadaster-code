@@ -257,7 +257,7 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
         batch_size = 16
     elif model_name.lower().startswith("stackedhourglass"):
         model = StackedHourglassRoadLabeler(1)
-        learning_rate = 0.00002
+        learning_rate = 0.00004
         batch_size = 16
     elif model_name.lower().startswith("unet"):
         model = UNetRoadLabeler(1, 1)

@@ -69,7 +69,7 @@ def inference(json_path, index=0):
         print("not a valid model name, check config.py")
         exit(1)
 
-    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/", model_name, ".pth"]), map_location='cpu'))
+    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/", model_name, "_dice_50", ".pth"]), map_location='cpu'))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
@@ -305,19 +305,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
                         continue
                     
                     shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
+    return binary_labels
         
 
 
-name= "wijk"
-model_name = "stackedhourglass_dice_50"
-alpha = 0.5
-beta = 0.5
-output_path = "".join([os.getcwd(), "/New_Labels/"])
-if not os.path.isdir(output_path):
-    os.makedirs(output_path)
-json_path = "".join([os.getcwd(), "/Data/JSON_files/", name, ".json"])
-label_path = "".join([output_path, name, "_labels_", str(alpha),"_", str(beta), ".shp"])
-prediction_path = "".join([output_path, name, "_prediction_", str(alpha), "_", str(beta), ".shp"])
-
-# om te runnen moet de locale server draaien met mapfile met rand
-polygonize_with_overlap_scores(json_path, label_path, image_index=0, alpha=alpha, beta=beta, prediction_shapefile_path=prediction_path)

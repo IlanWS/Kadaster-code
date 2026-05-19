@@ -11,7 +11,7 @@ results_folder = "".join([os.getcwd(),"/Data/Predictions/"])
 
 input_image_height = 360
 input_image_width = 640
-number_of_data_pairs = 100
+number_of_data_pairs = 1200
 data_split_proportion = 0.2
 
 #Hyperparamers (general, overwritten based on hyperparameter tuning results)
