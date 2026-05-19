@@ -317,6 +317,7 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
         print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
 
         early_stopping(val_loss, model)
+        
         if early_stopping.early_stop:
             print("Early stopping at epoch:", epoch + 1)
             torch.save(early_stopping.load_best_model(model), "".join([model_path, model_name, "_", str(epoch + 1), ".pth"]))
@@ -332,7 +333,3 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
     #Domme pytorch heeft geen summary functie, dus je zou pytorchsummary kunnen pip installen als je wil zien, dan from pytorchsummary import summary en deze lijn:
     #summary(model, input_size=(1, 512, 512))
     return x_train, y_train, x_test, y_test
-
-
-
-

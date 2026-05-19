@@ -4,15 +4,15 @@ import geopandas as gpd
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.cm as cm
+from matplotlib import colormaps as cm
 from matplotlib.colors import Normalize    
 from shapely.ops import unary_union
 
 #need to be connected with server, for roadmap
 def save_predictions():
     for name in ["small_scale_urban", "small_scale_rural", "large_scale_urban", "large_scale_rural"]:
-        for alpha in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-            for beta in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        for alpha in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
+            for beta in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
                 model_name = "stackedhourglass_dice_50"
                 output_path = "".join([os.getcwd(), "/New_Labels/"])
                 
@@ -97,11 +97,13 @@ def unambiguity(merged_road_network, labels_gdf):
     # Calculate total areas
     total_intersection_area = 0.0
     total_labels_area = 0.0
-    
+    number_of_labels = 0
+
     if merged_road_network is not None:
         for idx, row in labels_gdf.iterrows():
             label_geom = row.geometry
             total_labels_area += label_geom.area
+            number_of_labels += 1
             
             intersection = label_geom.intersection(merged_road_network)
             total_intersection_area += intersection.area
@@ -113,9 +115,9 @@ def unambiguity(merged_road_network, labels_gdf):
         average_overlap = total_intersection_area / total_labels_area
     else:
         average_overlap = 1.0
-    return average_overlap
+    return average_overlap, number_of_labels
 
-def buffer(labels_gdf, pixel_size, buffer_pixels=10):
+def buffer(labels_gdf, pixel_size, buffer_pixels=20):
     # buffer size in map units
     buffer_distance = buffer_pixels * pixel_size
 
@@ -141,39 +143,51 @@ def legibility(buffered_labels_gdf):
 
 def plot_results():
     for name in ["small_scale_urban", "large_scale_urban", "small_scale_rural", "large_scale_rural"]:
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(111, projection='3d')
+    #for name in ["large_scale_urban"]:
         output_path = "".join([os.getcwd(), "/New_Labels/"])
         json_path = "".join([os.getcwd(), "/Data/JSON_files/", name, ".json"])
         highest = 0
         alpha_values = []
         beta_values = []
         unambiguity_values = []
-        legibility_values = []  
+        legibility_values = []
+        number_of_label_values = []
 
 
-        for alpha in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-            for beta in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        for alpha in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
+            for beta in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
                 label_path = "".join([output_path, name, "_labels_", str(alpha),"_", str(beta), ".shp"])
                 merged_road_network, labels_gdf, pixel_width = get_road(json_path, label_path)
                 buffered_labels_gdf = buffer(labels_gdf, pixel_size=pixel_width)
 
-                unambiguity_score = unambiguity(merged_road_network, labels_gdf)
+                unambiguity_score, number_of_labels = unambiguity(merged_road_network, labels_gdf)
                 legibility_score = legibility(buffered_labels_gdf)
 
                 alpha_values.append(alpha)
                 beta_values.append(beta)
                 unambiguity_values.append(unambiguity_score)
-                legibility_values.append(legibility_score) 
+                legibility_values.append(legibility_score)
+                number_of_label_values.append(number_of_labels)
 
+                if unambiguity_score*legibility_score*(number_of_labels/10) > highest:
+                    highest = unambiguity_score*legibility_score*(number_of_labels/10)
+                    alpha_highest = alpha
+                    beta_highest = beta
+
+                print(f"unambiguity: {unambiguity_score:.4f}, legibility: {legibility_score:.4f}, number of labels: {number_of_labels} for alpha={alpha}, beta={beta}")
+
+        print(f"Highest score for {name}: {highest:.4f} with alpha={alpha_highest} and beta={beta_highest}")
 
         # Create color mapping from blue (low) to red (high)
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
         normalize = Normalize(vmin=min(unambiguity_values), vmax=max(unambiguity_values))
         colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
         colors = [colormap(normalize(value)) for value in unambiguity_values]
         
         z_values = np.zeros_like(unambiguity_values)
-        ax.bar3d(alpha_values, beta_values, z_values, 0.09, 0.09, unambiguity_values, color=colors)
+        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, unambiguity_values, color=colors)
         ax.set_zlim(0, 1)
         ax.set_xlabel('Alpha')
         ax.set_ylabel('Beta')
@@ -181,6 +195,37 @@ def plot_results():
         ax.set_title(f'Average Unambiguity for Different Alpha and Beta Values for {name}')
         plt.show()
 
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        normalize = Normalize(vmin=min(legibility_values), vmax=max(legibility_values))
+        colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
+        colors = [colormap(normalize(value)) for value in legibility_values]
+        
+        z_values = np.zeros_like(legibility_values)
+        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, [legibility_value-0.0 for legibility_value in legibility_values], color=colors)
+        ax.set_zlim(0, 1)
+        ax.set_xlabel('Alpha')
+        ax.set_ylabel('Beta')
+        ax.set_zlabel('Average Legibility')
+        ax.set_title(f'Average Legibility for Different Alpha and Beta Values for {name}')
+        plt.show()
+
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        normalize = Normalize(vmin=min(number_of_label_values), vmax=max(number_of_label_values))
+        colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
+        colors = [colormap(normalize(value)) for value in number_of_label_values]
+        
+        z_values = np.zeros_like(number_of_label_values)
+        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, number_of_label_values, color=colors)
+        ax.set_zlim(0, 12)
+        ax.set_xlabel('Alpha')
+        ax.set_ylabel('Beta')
+        ax.set_zlabel('Average Number of Labels')
+        ax.set_title(f'Average Number of Labels for Different Alpha and Beta Values for {name}')
+        plt.show()
 
 if __name__ == "__main__":
     if not os.path.isdir("".join([os.getcwd(), "/New_Labels/"])):
