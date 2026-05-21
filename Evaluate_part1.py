@@ -10,9 +10,10 @@ from shapely.ops import unary_union
 
 #need to be connected with server, for roadmap
 def save_predictions():
+    inference_times = []
     for name in ["small_scale_urban", "small_scale_rural", "large_scale_urban", "large_scale_rural"]:
-        for alpha in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
-            for beta in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
+        for alpha in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+            for beta in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
                 model_name = "stackedhourglass_dice_50"
                 output_path = "".join([os.getcwd(), "/New_Labels/"])
                 
@@ -23,8 +24,9 @@ def save_predictions():
                 label_path = "".join([output_path, name, "_labels_", str(alpha),"_", str(beta), ".shp"])
                 prediction_path = "".join([output_path, name, "_prediction_", str(alpha), "_", str(beta), ".shp"])
 
-                polygonize_with_overlap_scores(json_path, label_path, image_index=0, alpha=alpha, beta=beta, prediction_shapefile_path=prediction_path)
-
+                time, total_time = polygonize_with_overlap_scores(json_path, label_path, image_index=0, alpha=alpha, beta=beta, prediction_shapefile_path=prediction_path)
+                inference_times.append((name, time, total_time))
+    return inference_times
 
 def get_road(json_path, label_shapefile_path):    
     # Load JSON to get the image URL and georeference info
@@ -138,10 +140,63 @@ def legibility(buffered_labels_gdf):
     self_overlap_ratio = self_overlap_area / total_buffer_area
     return 1 - self_overlap_ratio
 
+def get_number_of_labels_from_json(json_path):
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    query = data[0]['Query']
+    bbox = query['BBOX'].split('%2C')
+    minx, miny, maxx, maxy = map(float, bbox)
+    crs = query['CRS'].replace('%3A', ':')
+    
+    url = data[0].get("URL")
+    if not url:
+        print(f"Error: No URL found in JSON")
+        return None
+    
+    # Get road network image (on port 8080)
+    if url.startswith("http://localhost/"):
+        url = url.replace("localhost/", "localhost:8080/")
+    
+    road_image = download_image_from_url(url)
+    if road_image is None:
+        print(f"Error: Failed to download road network image")
+        return None
+    
+    # Create binary mask of road network
+    road_arr = np.array(road_image)
+    
+    if road_arr.ndim == 3:
+        road_mask = np.mean(road_arr[:, :, :3], axis=2).astype(np.uint8)
+    else:
+        road_mask = road_arr
+    
+    if road_mask.dtype != np.uint8:
+        road_mask = (road_mask * 255).astype(np.uint8)
+    
+    # Apply threshold to create binary mask
+    binary_labels = (road_mask > int(0.5 * 255)).astype(np.uint8)
+    
+    # Get image dimensions for georeference
+    original_height, original_width = binary_labels.shape
+    
+    # Create transform for road network
+    pixel_width = (maxx - minx) / original_width
+    pixel_height = (maxy - miny) / original_height
+    transform_road = Affine.translation(minx, maxy) * Affine.scale(pixel_width, -pixel_height)
+
+    number_of_labels = 0
+    for geom, value in rasterio.features.shapes(binary_labels, mask=binary_labels, transform=transform_road):
+        if value == 1:
+            number_of_labels += 1
+
+    return number_of_labels
 
 #here we make a 3d barplot to visualize the average overlap for different alpha and beta values for each dataset. We iterate through each dataset, calculate the average overlap for each combination of alpha and beta, and store the results in lists. Finally, we create a 3D scatter plot to visualize the results.
 
 def plot_results():
+    results = {}
+    original_label_scores = {}
     for name in ["small_scale_urban", "large_scale_urban", "small_scale_rural", "large_scale_rural"]:
     #for name in ["large_scale_urban"]:
         output_path = "".join([os.getcwd(), "/New_Labels/"])
@@ -152,31 +207,37 @@ def plot_results():
         unambiguity_values = []
         legibility_values = []
         number_of_label_values = []
+        label_ratio_values = []
+        label_score_values = []
+        total_labels = get_number_of_labels_from_json(json_path)
 
-
-        for alpha in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
-            for beta in [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
+        for alpha in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+            for beta in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
                 label_path = "".join([output_path, name, "_labels_", str(alpha),"_", str(beta), ".shp"])
                 merged_road_network, labels_gdf, pixel_width = get_road(json_path, label_path)
                 buffered_labels_gdf = buffer(labels_gdf, pixel_size=pixel_width)
-
+    
                 unambiguity_score, number_of_labels = unambiguity(merged_road_network, labels_gdf)
                 legibility_score = legibility(buffered_labels_gdf)
+                label_ratio = number_of_labels/total_labels
 
+                if alpha == 0 and beta == 0:
+                    unambiguity_score_engine, number_of_labels_engine = unambiguity(merged_road_network, labels_gdf)
+                    legibility_score_engine = legibility(buffered_labels_gdf)
+            
                 alpha_values.append(alpha)
                 beta_values.append(beta)
                 unambiguity_values.append(unambiguity_score)
                 legibility_values.append(legibility_score)
                 number_of_label_values.append(number_of_labels)
-
-                if unambiguity_score*legibility_score*(number_of_labels/10) > highest:
-                    highest = unambiguity_score*legibility_score*(number_of_labels/10)
-                    alpha_highest = alpha
-                    beta_highest = beta
+                label_ratio_values.append(label_ratio)
 
                 print(f"unambiguity: {unambiguity_score:.4f}, legibility: {legibility_score:.4f}, number of labels: {number_of_labels} for alpha={alpha}, beta={beta}")
 
-        print(f"Highest score for {name}: {highest:.4f} with alpha={alpha_highest} and beta={beta_highest}")
+        label_score_values = [(unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)) * (legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)) * (label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+
+        results[name] = label_score_values
+        original_label_scores[name] = [unambiguity_score_engine, legibility_score_engine, number_of_labels_engine]
 
         # Create color mapping from blue (low) to red (high)
         fig = plt.figure(figsize=(12, 8))
@@ -214,20 +275,89 @@ def plot_results():
         fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection='3d')
 
-        normalize = Normalize(vmin=min(number_of_label_values), vmax=max(number_of_label_values))
+        normalize = Normalize(vmin=min(label_ratio_values), vmax=max(label_ratio_values))
         colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
-        colors = [colormap(normalize(value)) for value in number_of_label_values]
-        
-        z_values = np.zeros_like(number_of_label_values)
-        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, number_of_label_values, color=colors)
-        ax.set_zlim(0, 12)
+        colors = [colormap(normalize(value)) for value in label_ratio_values]
+
+        print(f"number of labels: {total_labels} for {name}")
+        z_values = np.zeros_like(label_ratio_values)
+        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, label_ratio_values, color=colors)
+        ax.set_zlim(0, 1)
         ax.set_xlabel('Alpha')
         ax.set_ylabel('Beta')
-        ax.set_zlabel('Average Number of Labels')
-        ax.set_title(f'Average Number of Labels for Different Alpha and Beta Values for {name}')
+        ax.set_zlabel('Average Label Ratio')
+        ax.set_title(f'Average Label Ratio for Different Alpha and Beta Values for {name}')
         plt.show()
 
+        
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        normalize = Normalize(vmin=min(label_score_values), vmax=max(label_score_values))
+        colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
+        colors = [colormap(normalize(value)) for value in label_score_values]
+
+        z_values = np.zeros_like(label_score_values)
+        ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, label_score_values, color=colors)
+        ax.set_zlim(0, 0.2)
+        ax.set_xlabel('Alpha')
+        ax.set_ylabel('Beta')
+        ax.set_zlabel('Average Label Score')
+        ax.set_title(f'Average Label Score for Different Alpha and Beta Values for {name}')
+        plt.show()
+    return results, alpha_values, beta_values, original_label_scores
+
+def plot_final_results(results, alpha_values, beta_values):
+    result_small_urban = results["small_scale_urban"]
+    result_small_rural = results["small_scale_rural"]
+    result_large_urban = results["large_scale_urban"]
+    result_large_rural = results["large_scale_rural"]
+
+    result = [(su + sr + lu + lr) / 4 for su, sr, lu, lr in zip(result_small_urban, result_small_rural, result_large_urban, result_large_rural)]
+    
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    normalize = Normalize(vmin=min(result), vmax=max(result))
+    colormap = cm.get_cmap('coolwarm')  # coolwarm goes from blue to red
+    colors = [colormap(normalize(value)) for value in result]
+
+    z_values = np.zeros_like(result)
+    ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, result, color=colors)
+    ax.set_zlim(0, 0.2)
+    ax.set_xlabel('Alpha')
+    ax.set_ylabel('Beta')
+    ax.set_zlabel('Average Label Score')
+    ax.set_title(f'Average Label Score for Different Alpha and Beta Values for all cases')
+    plt.show()
+
+def time_analysis(times):
+    for name in ["small_scale_urban", "small_scale_rural", "large_scale_urban", "large_scale_rural"]:
+        name_times = [time for n, time, total_time in times if n == name]
+        name_total_times = [total_time for n, time, total_time in times if n == name]
+        avg_time = sum(name_times) / len(name_times)
+        avg_total_time = sum(name_total_times) / len(name_total_times)
+        print(f"Average inference time for {name}: {avg_time:.4f} seconds")
+        print(f"Average total time for {name}: {avg_total_time:.4f} seconds")
+
 if __name__ == "__main__":
+    #times_bool = False 
     if not os.path.isdir("".join([os.getcwd(), "/New_Labels/"])):
-        save_predictions()
-    plot_results()
+        times = save_predictions()
+        times_bool = True
+        
+    results, alpha_values, beta_values, original_label_scores = plot_results()
+
+    plot_final_results(results,alpha_values, beta_values)
+
+    print("time performance averages:")
+    if times_bool:
+        time_analysis(times)
+
+    print("Original label scores:")
+    for name, scores in original_label_scores.items(): 
+        print(f"{name}: unambiguity={scores[0]:.4f}, legibility={scores[1]:.4f}, number of labels={scores[2]}") 
+
+
+
+

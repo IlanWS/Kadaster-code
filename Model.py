@@ -314,7 +314,7 @@ def compile_model(learning_rate=learning_rate, batch_size=batch_size, model_name
                 outputs = model(inputs)
                 val_loss += criterion(outputs, masks).item()
 
-        print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.4f} | Val Loss: {val_loss / len(test_loader):.4f}")
+        print(f"Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss / len(train_loader):.5f} | Val Loss: {val_loss / len(test_loader):.5f}")
 
         early_stopping(val_loss, model)
         

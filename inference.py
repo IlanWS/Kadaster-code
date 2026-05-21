@@ -247,7 +247,8 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
         all_predictions = None
     
     end_time = time.time()
-    print(f"Total time: {end_time - start_time:.2f} seconds, Inference time: {inference_time:.2f} seconds")
+    total_time = end_time - start_time
+    print(f"Total time: {total_time:.3f} seconds, Inference time: {inference_time:.3f} seconds")
     
     schema = {
         "geometry": "Polygon",
@@ -305,7 +306,7 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
                         continue
                     
                     shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
-    return binary_labels
+    return inference_time, total_time
         
 
 
