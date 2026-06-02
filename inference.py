@@ -34,19 +34,19 @@ def download_image_from_url(url, timeout_seconds=5):
         return None
 
 
-def inference(json_path, index=0):
+def inference(json_path, index=0, modelname=None):
     #load JSON to get the image URL
     with open(json_path, 'r') as f:
         data = json.load(f)
     
     if index >= len(data):
         print(f"Error: Index {index} out of range. JSON contains {len(data)} items.")
-        return None, None, None
+        return None, None, None, None
     
     url = data[index].get("URL")
     if not url:
         print(f"Error: No URL found at index {index}")
-        return None, None, None
+        return None, None, None, None
     
     #road network on port 80 (standard), labels on 8080
     if url.startswith("http://localhost:8080/"):
@@ -55,21 +55,21 @@ def inference(json_path, index=0):
     image = download_image_from_url(url)
     if image is None:
         print(f"Error: Failed to download image from URL")
-        return None, None, None
+        return None, None, None, None
     
     #load in model
-    if model_name.lower().startswith("deeplab"):
+    if modelname.lower().startswith("deeplab"):
         #result of hyperparameter tuning
         model = DeepLabRoadLabeler(1, use_aux=False)
-    elif model_name.lower().startswith("stackedhourglass"):
+    elif modelname.lower().startswith("stackedhourglass"):
         model = StackedHourglassRoadLabeler(1)
-    elif model_name.lower().startswith("unet"):
+    elif modelname.lower().startswith("unet"):
         model = UNetRoadLabeler(1, 1)
     else:
         print("not a valid model name, check config.py")
         exit(1)
 
-    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/", model_name, "_dice_50", ".pth"]), map_location='cpu'))
+    model.load_state_dict(torch.load("".join([os.getcwd(), "/Models/", modelname]), map_location='cpu'))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
@@ -175,16 +175,16 @@ def get_labels(json_path, index=0):
     return predictions_resized, (original_width, original_height)
 
 
-def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=0, alpha=0.5, beta=0.5, prediction_shapefile_path=None):
+def polygonize_with_overlap_scores(modelname, json_path, label_shapefile_path, image_index=0, alpha=0.5, beta=0.5, prediction_shapefile_path=None):
     with open(json_path, 'r') as f:
         data = json.load(f)
-    query = data[0]['Query']
+    query = data[image_index]['Query']
     bbox = query['BBOX'].split('%2C')
     minx, miny, maxx, maxy = map(float, bbox)
     crs = query['CRS'].replace('%3A', ':')
 
     # Get predictions
-    predictions_img, start_time, original_dims, inference_time = inference(json_path, image_index)
+    predictions_img, start_time, original_dims, inference_time = inference(json_path, image_index, modelname)
     if predictions_img is None:
         print("Error: Inference failed")
         return
@@ -307,6 +307,3 @@ def polygonize_with_overlap_scores(json_path, label_shapefile_path, image_index=
                     
                     shp.write({"geometry": mapping(geom_shape), "properties": {"value": int(value)}})
     return inference_time, total_time
-        
-
-

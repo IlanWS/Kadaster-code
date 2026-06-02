@@ -2850,70 +2850,85 @@ MAP
     END
   END # LAYER
 
-  # straatnamen
-  LAYER
-    NAME "straatnamen"
-    LABELITEM "label"
-    TYPE LINE
-    EXTENT -1000000 -1000000 1150000 1900000
+# 1. THE LEADER LAYER (Calculates everything and checks scale)
+# =========================================================================
+LAYER
+  NAME "straatnamen_liberation"
+  LABELITEM "label"
+  TYPE LINE                  
+  STATUS ON
+  EXTENT -1000000 -1000000 1150000 1900000
 
-    METADATA
-      "ows_title" "straatnamen"
+  CONNECTIONTYPE OGR
+  CONNECTION "/srv/data/gpkg/brtachtergrondkaart.gpkg"
+  DATA "straatnamen"
+  
+  PROCESSING 'NATIVE_FILTER=minscaledenom <= %scale% AND maxscaledenom > %scale%'
+  PROCESSING "CLOSE_CONNECTION=DEFER"
+  PROCESSING "LABEL_NO_CLIP=ON"
+
+  SCALETOKEN
+    NAME "%scale%"
+    VALUES
+      "0" "0"
+      "750" "750"
+      # ... Keep your scale tokens here ...
+      "6144000" "6144000"
     END
+  END
 
-    SCALETOKEN
-      NAME "%scale%"
-      VALUES
-        "0"        "0"
-        "750"      "750"
-        "1500"     "1500"
-        "3000"     "3000"
-        "6000"     "6000"
-        "12000"    "12000"
-        "24000"    "24000"
-        "48000"    "48000"
-        "96000"    "96000"
-        "192000"   "192000"
-        "384000"   "384000"
-        "768000"   "768000"
-        "1536000"  "1536000"
-        "3072000"  "3072000"
-        "6144000"  "6144000"
-      END # VALUES
-    END # SCALETOKEN
+  MINSCALEDENOM 0
+  MAXSCALEDENOM 48000
 
-    CONNECTIONTYPE OGR
-    CONNECTION "/srv/data/gpkg/brtachtergrondkaart.gpkg"
-    DATA "straatnamen"
-    PROCESSING 'NATIVE_FILTER=minscaledenom <= %scale% AND maxscaledenom > %scale%'
-    PROCESSING "CLOSE_CONNECTION=DEFER"
-    PROCESSING "LABEL_NO_CLIP=ON"
-    TEMPLATE "dummy"
-
-    MINSCALEDENOM 0
-    MAXSCALEDENOM 48000
-
-    CLASS
-      # labels straatnamen
-      NAME "straatnamen"
-      # geen_expression
-      LABEL
-        MINDISTANCE 5
-        BUFFER 5
-        COLOR "#000000"
-        FONT "liberation-sans"
-
-        TYPE truetype
-        SIZE [size]
-        ANGLE FOLLOW
-        POSITION cc
-        PARTIALS TRUE
-        REPEATDISTANCE 512
-        ALIGN center
-        PRIORITY 4
-      END
+  CLASS
+    NAME "straatnamen_base"
+    LABEL
+      FONT "liberation-sans"
+      TYPE truetype
+      SIZE [size]
+      COLOR "#FFFFFF"        
+      OUTLINECOLOR "#FFFFFF"
+      ANGLE FOLLOW
+      PARTIALS TRUE
+      ALIGN center
+      PRIORITY 4
+      POSITION CC
     END
-  END # LAYER
+  END
+END # LAYER
+
+
+# 2. THE FOLLOWER LAYER (Fixed parser error near CLASS)
+# =========================================================================
+LAYER
+  NAME "straatnamen_mark"
+  TYPE POINT                 
+  STATUS ON
+  
+  GEOMTRANSFORM "labelpoint:straatnamen_liberation" 
+
+  # FIX: MapServer 8 requires an inline feature anchor to bind 
+  # a layer-level GEOMTRANSFORM to a CLASS block successfully.
+  FEATURE
+  END
+
+  CLASS
+    NAME "straatnamen_mark_class"
+    LABEL
+      FONT "marked-font"
+      TYPE truetype
+      SIZE [size]
+      COLOR "#000000"
+      OUTLINECOLOR "#000000"
+      ANGLE FOLLOW
+      PARTIALS TRUE
+      ALIGN center
+      PRIORITY 4
+      POSITION CC
+      FORCE TRUE             
+    END
+  END
+END # LAYER
 
   # waterlabellijn_2
   LAYER

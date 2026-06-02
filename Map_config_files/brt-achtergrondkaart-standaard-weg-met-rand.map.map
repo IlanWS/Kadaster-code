@@ -9,8 +9,8 @@ MAP
   FONTSET               "/srv/data/fonts.list"
   EXTENT                -1000000 -1000000 1150000 1900000
   STATUS                ON
-  # CONFIG                "CPL_DEBUG" "ON"
-  # DEBUG                 4
+  CONFIG                "CPL_DEBUG" "ON"
+  DEBUG                 4
 
   RESOLUTION 91
   DEFRESOLUTION 91

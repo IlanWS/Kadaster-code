@@ -14,7 +14,7 @@ def save_predictions():
     for name in ["small_scale_urban", "small_scale_rural", "large_scale_urban", "large_scale_rural"]:
         for alpha in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
             for beta in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
-                model_name = "stackedhourglass_dice_50"
+                model_name = "stackedhourglass_dice_73"
                 output_path = "".join([os.getcwd(), "/New_Labels/"])
                 
                 if not os.path.isdir(output_path):
@@ -119,7 +119,7 @@ def unambiguity(merged_road_network, labels_gdf):
         average_overlap = 1.0
     return average_overlap, number_of_labels
 
-def buffer(labels_gdf, pixel_size, buffer_pixels=20):
+def buffer(labels_gdf, pixel_size, buffer_pixels=15):
     # buffer size in map units
     buffer_distance = buffer_pixels * pixel_size
 
@@ -194,7 +194,7 @@ def get_number_of_labels_from_json(json_path):
 
 #here we make a 3d barplot to visualize the average overlap for different alpha and beta values for each dataset. We iterate through each dataset, calculate the average overlap for each combination of alpha and beta, and store the results in lists. Finally, we create a 3D scatter plot to visualize the results.
 
-def plot_results():
+def plot_results(w1=1,w2=1,w3=2):
     results = {}
     original_label_scores = {}
     for name in ["small_scale_urban", "large_scale_urban", "small_scale_rural", "large_scale_rural"]:
@@ -224,18 +224,22 @@ def plot_results():
                 if alpha == 0 and beta == 0:
                     unambiguity_score_engine, number_of_labels_engine = unambiguity(merged_road_network, labels_gdf)
                     legibility_score_engine = legibility(buffered_labels_gdf)
-            
-                alpha_values.append(alpha)
-                beta_values.append(beta)
-                unambiguity_values.append(unambiguity_score)
-                legibility_values.append(legibility_score)
-                number_of_label_values.append(number_of_labels)
-                label_ratio_values.append(label_ratio)
+                elif alpha == 0 or beta == 0:
+                    print("")
+                else: 
+                    alpha_values.append(alpha)
+                    beta_values.append(beta)
+                    unambiguity_values.append(unambiguity_score)
+                    legibility_values.append(legibility_score)
+                    number_of_label_values.append(number_of_labels)
+                    label_ratio_values.append(label_ratio)
 
-                print(f"unambiguity: {unambiguity_score:.4f}, legibility: {legibility_score:.4f}, number of labels: {number_of_labels} for alpha={alpha}, beta={beta}")
+                    print(f"unambiguity: {unambiguity_score:.4f}, legibility: {legibility_score:.4f}, number of labels: {number_of_labels} for alpha={alpha}, beta={beta}")
 
-        label_score_values = [(unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)) * (legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)) * (label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
-
+        #label_score_values = [(w1 * (unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)) + w2 * (legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)) + w3 * (label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values))) / (5 * (w1 + w2 + w3)) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        #label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**(1/w1) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**(1/w2) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**(1/w3) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values))) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values))) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values))) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        
         results[name] = label_score_values
         original_label_scores[name] = [unambiguity_score_engine, legibility_score_engine, number_of_labels_engine]
 
@@ -341,7 +345,7 @@ def time_analysis(times):
         print(f"Average total time for {name}: {avg_total_time:.4f} seconds")
 
 if __name__ == "__main__":
-    #times_bool = False 
+    times_bool = False 
     if not os.path.isdir("".join([os.getcwd(), "/New_Labels/"])):
         times = save_predictions()
         times_bool = True

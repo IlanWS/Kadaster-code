@@ -10,8 +10,8 @@ print(requests.__version__)
 
 timeout_seconds = 5
 
-json_path = "".join([os.getcwd(),"/Data/JSON_files/amsterdam.json"])
-input_folder = "".join([os.getcwd(),"/Data/Labels/amsterdam"])
+json_path = "".join([os.getcwd(),"/Data/JSON_files/enschede_SR.json"])
+input_folder = "".join([os.getcwd(),"/Data/Test/SR"])
 
 def json_download(folder):
     if not os.path.exists(folder):
