@@ -9,12 +9,11 @@ from matplotlib.colors import Normalize
 from shapely.ops import unary_union
 
 #need to be connected with server, for roadmap
-def save_predictions():
+def save_predictions(modelname):
     inference_times = []
     for name in ["small_scale_urban", "small_scale_rural", "large_scale_urban", "large_scale_rural"]:
         for alpha in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
             for beta in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
-                model_name = "stackedhourglass_dice_73"
                 output_path = "".join([os.getcwd(), "/New_Labels/"])
                 
                 if not os.path.isdir(output_path):
@@ -24,7 +23,7 @@ def save_predictions():
                 label_path = "".join([output_path, name, "_labels_", str(alpha),"_", str(beta), ".shp"])
                 prediction_path = "".join([output_path, name, "_prediction_", str(alpha), "_", str(beta), ".shp"])
 
-                time, total_time = polygonize_with_overlap_scores(json_path, label_path, image_index=0, alpha=alpha, beta=beta, prediction_shapefile_path=prediction_path)
+                time, total_time = polygonize_with_overlap_scores(modelname, json_path, label_path, image_index=0, alpha=alpha, beta=beta, prediction_shapefile_path=prediction_path)
                 inference_times.append((name, time, total_time))
     return inference_times
 
@@ -110,16 +109,16 @@ def unambiguity(merged_road_network, labels_gdf):
             intersection = label_geom.intersection(merged_road_network)
             total_intersection_area += intersection.area
     else:
-        average_overlap = 1.0
+        return 0.0, 0
     
     # Calculate average overlap
     if total_labels_area > 0:
         average_overlap = total_intersection_area / total_labels_area
     else:
-        average_overlap = 1.0
+        average_overlap = 0.0
     return average_overlap, number_of_labels
 
-def buffer(labels_gdf, pixel_size, buffer_pixels=15):
+def buffer(labels_gdf, pixel_size, buffer_pixels=50):
     # buffer size in map units
     buffer_distance = buffer_pixels * pixel_size
 
@@ -194,7 +193,7 @@ def get_number_of_labels_from_json(json_path):
 
 #here we make a 3d barplot to visualize the average overlap for different alpha and beta values for each dataset. We iterate through each dataset, calculate the average overlap for each combination of alpha and beta, and store the results in lists. Finally, we create a 3D scatter plot to visualize the results.
 
-def plot_results(w1=1,w2=1,w3=2):
+def plot_results(w1=1,w2=1,w3=1):
     results = {}
     original_label_scores = {}
     for name in ["small_scale_urban", "large_scale_urban", "small_scale_rural", "large_scale_rural"]:
@@ -235,13 +234,25 @@ def plot_results(w1=1,w2=1,w3=2):
                     label_ratio_values.append(label_ratio)
 
                     print(f"unambiguity: {unambiguity_score:.4f}, legibility: {legibility_score:.4f}, number of labels: {number_of_labels} for alpha={alpha}, beta={beta}")
-
+        #label_score_values = [unambiguity**2 * legibility**2 * label_ratio**2 for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
         #label_score_values = [(w1 * (unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)) + w2 * (legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)) + w3 * (label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values))) / (5 * (w1 + w2 + w3)) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
-        #label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**(1/w1) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**(1/w2) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**(1/w3) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
-        label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values))) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values))) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values))) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
-        
+        #label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**2 * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**2 * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**2 for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        """
+        if all(v == 0 or v == 1 for v in unambiguity_values):
+            label_score_values = [((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**(1/w2) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**(1/w3) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        elif all(v == 0 or v == 1 for v in legibility_values):
+            label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**(1/w1) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**(1/w3) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        elif all(v == 0 or v == 1 for v in label_ratio_values):
+            label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**(1/w1) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**(1/w2) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        else:
+            label_score_values = [((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values)))**(1/w1) * ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values)))**(1/w2) * ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values)))**(1/w3) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+        """
+        label_score_values = [((unambiguity + legibility)/2) * label_ratio**0.5 for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+
+        #label_score_values = [(((unambiguity - min(unambiguity_values)) / (max(unambiguity_values) - min(unambiguity_values))) + ((legibility - min(legibility_values)) / (max(legibility_values) - min(legibility_values))))/2 + ((label_ratio - min(label_ratio_values)) / (max(label_ratio_values) - min(label_ratio_values))) for unambiguity, legibility, label_ratio in zip(unambiguity_values, legibility_values, label_ratio_values)]
+
         results[name] = label_score_values
-        original_label_scores[name] = [unambiguity_score_engine, legibility_score_engine, number_of_labels_engine]
+        original_label_scores[name] = (unambiguity_score_engine, legibility_score_engine, number_of_labels_engine)
 
         # Create color mapping from blue (low) to red (high)
         fig = plt.figure(figsize=(12, 8))
@@ -303,7 +314,7 @@ def plot_results(w1=1,w2=1,w3=2):
 
         z_values = np.zeros_like(label_score_values)
         ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, label_score_values, color=colors)
-        ax.set_zlim(0, 0.2)
+        ax.set_zlim(0, 1)
         ax.set_xlabel('Alpha')
         ax.set_ylabel('Beta')
         ax.set_zlabel('Average Label Score')
@@ -328,7 +339,7 @@ def plot_final_results(results, alpha_values, beta_values):
 
     z_values = np.zeros_like(result)
     ax.bar3d(alpha_values, beta_values, z_values, 0.045, 0.045, result, color=colors)
-    ax.set_zlim(0, 0.2)
+    ax.set_zlim(0, 1)
     ax.set_xlabel('Alpha')
     ax.set_ylabel('Beta')
     ax.set_zlabel('Average Label Score')
@@ -346,8 +357,10 @@ def time_analysis(times):
 
 if __name__ == "__main__":
     times_bool = False 
+    model_name = "stackedhourglass_dice_ES_73.pth"
+
     if not os.path.isdir("".join([os.getcwd(), "/New_Labels/"])):
-        times = save_predictions()
+        times = save_predictions(model_name)
         times_bool = True
         
     results, alpha_values, beta_values, original_label_scores = plot_results()

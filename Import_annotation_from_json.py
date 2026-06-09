@@ -6,10 +6,12 @@ import shutil
 from PIL import Image, ImageDraw
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-name = "combined"
 
-json_path = os.path.join(BASE_DIR, 'Data', 'JSON_files', 'deventer_2500_land_annotation.json')
-output_dir = os.path.join(BASE_DIR, 'Data', 'Roadnetwork', name) #change to "Labels" to make labels combined
+#json_path = os.path.join(BASE_DIR, 'Data', 'JSON_files', 'deventer_2500_land_annotation.json')
+#output_dir = os.path.join(BASE_DIR, 'Data', 'Roadnetwork', name) #change to "Labels" to make labels combined
+
+output_dir = "".join([os.getcwd(), "/Ground_Truth/", "SR", "/"])
+json_path = "".join([os.getcwd(), "/Data/JSON_files/", "SR.json"])
 
 
 def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
@@ -25,46 +27,50 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
     annotations_map = data['tools_data_map']["Bbox"]["specifics"]["Bbox"]['annotations_map']
 
     image_counter = 0
-
+    allowed_prefix = os.path.normpath(r"C:/Users/SmeerdijkIlan/Documents/Master_thesis_opdracht/Data/Test/SR")
 
     for file_path, content in annotations_map.items():
-        if name in file_path:
-            if len(content) < 2:
-                continue
-                
-            anno_data = content[0]
-            size_data = content[1]
-            
-            width = size_data.get('w', width)
-            height = size_data.get('h', height)
+        normalized_path = os.path.normpath(file_path)
+        if not normalized_path.startswith(allowed_prefix + os.sep) and normalized_path != allowed_prefix:
+            continue
 
-            # make empty mask
-            mask = Image.new('RGB', (width, height), (0, 0, 0))
-            draw = ImageDraw.Draw(mask)
+        if len(content) < 2:
+            print("length smaller than 2, skipping:", file_path)
+            continue
 
-            elements = anno_data.get('elts', [])
-            has_labels = False
+        anno_data = content[0]
+        size_data = content[1]
 
-            for elt in elements:
-                if 'Poly' in elt:
-                    poly_data = elt['Poly']
+        width = size_data.get('w', width)
+        height = size_data.get('h', height)
+
+        # make empty mask
+        mask = Image.new('RGB', (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(mask)
+
+        elements = anno_data.get('elts', [])
+        has_labels = False
+
+        for elt in elements:
+            if 'Poly' in elt:
+                poly_data = elt['Poly']
                     
                     # take x and y coordinates and turn into points
-                    if 'points' in poly_data:
-                        points_list = []
-                        for p in poly_data['points']:
-                            points_list.append((p['x'], p['y']))
+                if 'points' in poly_data:
+                    points_list = []
+                    for p in poly_data['points']:
+                        points_list.append((p['x'], p['y']))
                         
                         #make polygon
-                        if len(points_list) >= 3:
-                            draw.polygon(points_list, fill=(255, 255, 255))
-                            has_labels = True
+                    if len(points_list) >= 3:
+                        draw.polygon(points_list, fill=(255, 255, 255))
+                        has_labels = True
 
-            if has_labels:
-                output_name = os.path.basename(file_path).replace('.jpg', '.jpg')
-                mask.save(os.path.join(output_dir, output_name), format='JPEG')
-                print(f"Opgeslagen: {output_name} (Exacte vorm van {file_path})")
-                image_counter += 1
+        if has_labels:
+            output_name = os.path.basename(file_path).replace('.jpg', '.jpg')
+            mask.save(os.path.join(output_dir, output_name), format='JPEG')
+            print(f"Opgeslagen: {output_name} (Exacte vorm van {file_path})")
+            image_counter += 1
 
 #extract_rvimage_masks(json_path, output_dir)
 
@@ -118,7 +124,9 @@ def extract():
     print('Combining label images into:', output_dir)
     combine_label_folders(source_root, output_dir, folder_sequence, start_points)
 
-extract()
+if __name__ == "__main__":
+    #extract()
+    extract_rvimage_masks(json_path, output_dir)
 
 #To create empty mask for images without labels on them, so number of data pairs stays the same
 """
