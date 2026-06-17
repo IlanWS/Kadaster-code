@@ -1,3 +1,5 @@
+# Only ran if make_comparison = true. Makes nice comparison from images in local created by Load_model.py.
+
 from Data_preprocessing import *
 from config import *
 
