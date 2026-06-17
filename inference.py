@@ -1,6 +1,6 @@
 #Here we create a workflow to inference a shapefile from only the roadnetwork as input data
 #We start by running the input roadnetwork through the model, then we take the output and polygonize it add the geolocation data
-#we use the amsterdam image and the stacked hourglass model with 50 epochs
+
 from Model import *
 from config import *
 

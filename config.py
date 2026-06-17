@@ -16,7 +16,7 @@ data_split_proportion = 0.2
 
 #Hyperparamers (general, overwritten based on hyperparameter tuning results)
 learning_rate = 0.00001
-batch_size = 32 #16 might be needed for some models
+batch_size = 32 #16 might be needed for some models, depending on memory
 epochs = 100
 early_stopping_patience = 5
 early_stopping_delta = 0.001 

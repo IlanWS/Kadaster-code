@@ -1,3 +1,6 @@
+# Only needs to be done once, turns JSON file data from rvimage into label images through localhost map. Used to create images in Data/Labels 
+# Combined data comes from different JSON files so must be ran multiple times and then run with combine_label_folders to combine
+
 from config import *
 
 import json
@@ -27,12 +30,9 @@ def extract_rvimage_masks(json_path, output_dir, width = 640, height = 360):
     annotations_map = data['tools_data_map']["Bbox"]["specifics"]["Bbox"]['annotations_map']
 
     image_counter = 0
-    allowed_prefix = os.path.normpath(r"C:/Users/SmeerdijkIlan/Documents/Master_thesis_opdracht/Data/Test/SR")
 
     for file_path, content in annotations_map.items():
-        normalized_path = os.path.normpath(file_path)
-        if not normalized_path.startswith(allowed_prefix + os.sep) and normalized_path != allowed_prefix:
-            continue
+
 
         if len(content) < 2:
             print("length smaller than 2, skipping:", file_path)

@@ -1,3 +1,6 @@
+# Thought i would get real creative with it, but in the end an existing loss_function (dice_bce_loss) worked the best. womp womp
+# Earlystopping is also here, both this and loss function are only called in Model.py
+
 from config import *
 
 import torch

@@ -1,3 +1,4 @@
+#only for splitting the data
 from Image_load import *
 from config import *
 

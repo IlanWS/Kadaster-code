@@ -1,6 +1,8 @@
+# Only run this if new data must be obtained from QGIS through the localhost server, used to create the images in Data/Roadnetworks
+# Run btr-achtergrondkaart-standaart-weg-met-rand in the localhost on ubuntu
+
 from config import *
 
-#only needs to be ran if new data must be obtained from QGIS through the WSL server
 import json
 import os.path
 import requests

@@ -1,4 +1,6 @@
-#run this script in QGIS to harvest images into a json file
+# Run this script in QGIS to harvest images information into a json file. Not to be ran outsinde of QGIS.
+# Resulting JSON file is e.g. enschede_LR.json, containing a bbox and link for the local host. These results are used in JSON_download
+
 import time
 
 #huidige extent van de GUI
@@ -27,5 +29,4 @@ for i in range(25):
         loop.exec_()
         time.sleep(0.1)
 
-#canvas.zoomByFactor(1.5)
 

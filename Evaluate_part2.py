@@ -1,3 +1,8 @@
+# Part 2 of the evaluation, this one is really anoying because the position of the right ground truth images (Data/Test)aee not equal to the positions in the JSON
+# Which is used to harverst the labels used as original labels. The get_ground_truth_labels fiunction is really only for Wouters labels because I dicided to 
+# To trace those in rvimage rather than qgis beacuse i'm an idiot. The other ground truth labels are simply tracked over the original labels in QGIS and manually 
+# Copied into the directory. Again, run roadpieces (port 80) and labels (port 8080) in seperate ubuntu windows. 
+
 from inference import polygonize_with_overlap_scores, get_labels
 from Import_annotation_from_json import extract_rvimage_masks
 

@@ -1,3 +1,8 @@
+# In this file we conduct the first evaluation, first defining fnuctions that calculate overlap with other labels and roadpieces and such
+# This is done for the whole vector layer (one image at the time) rather than per individual label. 
+# We also visualize the whole lot. The evaluation depends heavily on the inferency.py file, so make sure you are running 
+# Both the roadpieces (port 80, default) and labels (port 8080) on localhost in seperate ubuntu windows
+
 from inference import *
 
 import geopandas as gpd

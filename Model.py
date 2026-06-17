@@ -1,3 +1,6 @@
+# Central deep leanring model code file. All models are defined as classes and an instance is created based on the model_name specified in the compile function
+# If no model name is given when calling this function (such as in main), the modelname specified in config will be used. Standard training data is "combined".
+
 from Data_preprocessing import *
 from config import *
 from Loss_functions import *

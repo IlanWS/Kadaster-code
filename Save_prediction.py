@@ -1,3 +1,5 @@
+# Print images into local. No clue why i put this outside of Load_model.py. Would pob work if this was put into Load_model and the imports are changed a bit but whatever it works
+
 from Load_model import *
 from Data_preprocessing import *
 from config import *

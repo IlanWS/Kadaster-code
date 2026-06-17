@@ -1,8 +1,9 @@
+# Here we import images from files into numpy arrays. 625 images of 512 by 512 arcross 3 channels (RGB)
+# Images are already right format, but slice anyway to ensure no shape mismatch error in the model
+# Before running, ensure that the data is downloaded in the correct directory, or change dir in config.py
+
 from config import *
 
-#import images from files into numpy arrays. 625 images of 512 by 512 arcross 3 channels (RGB)
-#images are already right format, but slice anyway to ensure no shape mismatch error in the model
-#before running, ensure that the data is downloaded in the correct directory, or change dir in config.py
 from PIL import Image
 import numpy as np
 import os

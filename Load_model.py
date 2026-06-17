@@ -1,3 +1,6 @@
+# This in only for the visualzation in Data/Predictions. If make_comparison = True, Save_prediction is called in main, wich calls this file to load 
+# All the intermediate model and run the same images on all of them, saving the prediction to local such that a nice comparison image can be made in visualize.py.
+
 from config import *
 from Model import *
 from Data_preprocessing import *
